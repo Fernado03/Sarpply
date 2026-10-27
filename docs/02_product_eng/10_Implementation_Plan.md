@@ -138,8 +138,8 @@ Scale rule: **do not add a Route until the existing ones have cleared the gate f
 | 1 | `A1`/`A2` nested or separate cartons | Changes vehicle class and payload model |
 | 2 | Real carton dimensions for `B1`, `C1`, `D1` | Sortie capacity check is only as good as `carton_geometric_liters` |
 | 3 | Petrol inside RM 42.50 | Determines real net margin |
-| 4 | Voice-note retention policy | Storing customer audio without a policy is a PDPA problem |
+| 4 | ~~Voice-note retention policy~~ | **Resolved** — deleted 7 days after reconciliation, disclosed weekly (`ADR-0017`) |
 | 5 | Gate cleared twice | `ADR-0009` |
 | 6 | Prepayment flow | Not needed — none exists. Do not build one. |
 
-Items 1–3 are phone calls. Item 5 is two weeks of real work. Everything else in the ten pillars is now internally consistent and testable; these six are the only things standing between the documents and a defensible build.
+Items 1–3 are phone calls — someone else's knowledge, not a design decision. Item 5 is two weeks of real trading. Item 6 is a decision already made (don't). That leaves **three calls and two weeks** between these documents and a defensible build.

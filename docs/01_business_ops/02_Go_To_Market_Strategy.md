@@ -113,6 +113,7 @@ HARGA POOL MINGGU NI:
 👇 Cara order: balas mesej ni dengan kod & kuantiti saja.
 Contoh: "A1 x 3, C1 x 2, E1 x 1"
 Atau hantar voice note — kami akan baca balik untuk confirm.
+🔒 Voice note disimpan 7 hari sahaja untuk semakan pesanan, lepas tu dipadam.
 ```
 
 ### Script C: Wednesday 12:30 Order Confirmation

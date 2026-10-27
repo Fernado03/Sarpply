@@ -193,5 +193,5 @@ There is **no hardcoded cron table**. The old v1.0 table (`0 14 * * 2` … `30 1
 | :--- | :--- | :--- |
 | `A1`/`A2` nested vs separate lid cartons | Founder → Wholesaler (Script A Q1) | **Yes** — changes vehicle choice |
 | Petrol included in RM 42.50/sortie? | Founder → Runner hiring | No, but affects net |
-| Voice-note retention/PDPA policy | Founder | Yes, before storing audio |
+| ~~Voice-note retention/PDPA policy~~ | **Resolved** — 7 days after reconciliation (`ADR-0017`) | Closed |
 | Stage 1 / Stage 2 threshold values | Founder | No — defaults above |
