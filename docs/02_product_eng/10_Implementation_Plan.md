@@ -1,80 +1,145 @@
 ---
 project: Sarpply
 pillar: 10_Implementation_Plan
-version: 1.0-MVP-to-Scale
-timeline: 16-Week Phased Execution Roadmap
+version: 1.1-MVP-to-Phase2
+timeline: Gate-driven, not calendar-driven
+gate: >= RM 1,500 GMV and >= RM 150 Realized GP per Route shift, 2 consecutive weeks
+supersedes: v1.0 (16-week calendar, 8-stall cluster, RM 2,000/wk, RM 45/trip, RM 6,200/mo)
 ---
 
-# Sarpply — Pillar 10: Phased Implementation & Rollout Plan
+# Sarpply — Pillar 10: Implementation & Rollout
 
-## 1. Execution Roadmap Overview
+> Terminology per `GLOSSARY.md`. Times are MYT.
 
-Sarpply follows a disciplined **Zero-Code Validation First, Automation Second** trajectory. No custom software is deployed during the first 4 weeks until the Premier 101 beachhead unit economics (8 stalls, RM 2,000 GMV, 9.4%–7.75% Net Contribution Margin) are validated on the ground.
+## 1. The plan is gated, not dated
 
-| Phase | Timeframe | Operational Focus | Technical Deliverable | Target Economics |
-| :--- | :--- | :--- | :--- | :--- |
-| **Phase 0: Pre-Launch Setup** | Days 1–5 | Lock in Pending Industrial Estate suppliers & onboard first 8 Premier 101 stalls during 2:15 PM–4:00 PM breaks. | WhatsApp Business Catalog + Laminated Bilingual Pool Price Card + Master Google Sheet. | RM 0 fixed burn. |
-| **Phase 1A: Founder-Driven Pilot** | Weeks 1–2 | Execute first 2 Tuesday-to-Thursday batch loops with founder driving cross-dock delivery. | Validate Google Sheets `Wholesaler_Aggregator` formulas and DuitNow QR stall collection. | 1 Cluster • RM 2,000/wk GMV • RM 188/batch NCM (9.4%). |
-| **Phase 1B: MPV Runner Handover** | Weeks 3–4 | Transition Thursday 1:30 PM–3:30 PM shift to part-time MPV runner at flat RM 45 payout. | Laminated Corporate DuitNow QR Card + Zero-Leakage Runner SOP. | 1 Cluster • RM 2,000/wk GMV • RM 155/batch NCM (7.75%). |
-| **Phase 2: Automated Platform Build** | Weeks 5–8 | Replace manual WhatsApp entry & Google Sheets with automated webhook + Supabase DB. | Deploy PostgreSQL schema, Regex + Trilingual LLM Parser, Admin Console, and Runner Web App. | 3 Clusters (Premier 101, Tabuan Jaya, Stutong). |
-| **Phase 3: Kuching 10-Cluster Scale** | Weeks 9–16 | Replicate across 10 high-density Kuching commercial zones (40 batches/month). | Multi-cluster runner dispatch routing, automated restock predictions, and verified stall credit tiers. | 10 Clusters • RM 80,000/mo GMV • RM 6,200/mo Net Profit. |
+v1.0 was a 16-week calendar: build the platform in Week 5 regardless of whether the business worked. That is the single most expensive mistake available here, because Phase 2 is built to operate a model whose inputs — basket size, drink-anchor volume, Cluster conversion — were invented.
 
----
+**Phase 2 starts only when a Route has cleared the gate for two consecutive weeks** (`ADR-0009`):
 
-## 2. Step-by-Step Phase Breakdown
+> **≥ RM 1,500 GMV and ≥ RM 150 Realized GP per Route shift, two weeks running.**
 
-### Phase 0: Pre-Launch Setup & Field Onboarding (Days 1–5)
+Realized GP, not forecast. Measured on **Delivered Bundles**, so a shortfall cannot hide (`ADR-0010`).
 
-1. **Days 1–2 (Pending Wholesaler Lock-In):**
-   * Send `Script A` via WhatsApp to 3 packaging and commercial consumable wholesalers in **Pending Industrial Estate** and **Demak Laut**.
-   * Lock in Master Carton self-pickup pricing for the **Golden 6 SKUs** (`A1` RM 135, `A2` RM 148, `B1` RM 102, `C1` RM 110, `D1` RM 128, `E1` RM 46) and establish dual-supplier redundancy.
-2. **Day 2 (Zero-Code Tooling Setup):**
-   * Configure WhatsApp Business Profile (`Sarpply Kuching`), create the `Premier 101 Pool` Broadcast List, and print 20 laminated A5 **1-Page Bilingual Pool Price Cards** and 2 **Corporate DuitNow QR Cards**.
-   * Build the Google Sheets Master Workbook with `SKU_Master`, `Vendor_Orders`, and `Wholesaler_Aggregator` tabs using the `SUMIF`, `CEILING`, and `VLOOKUP` formulas.
-3. **Days 3–5 (Off-Peak Walk-In Onboarding at Premier 101):**
-   * Visit **Premier 101 / Jalan Tun Jugah** strictly between **14:15 and 16:00 MYT** carrying a physical sample of SKU `A1` (650ml PP box).
-   * Secure the anchor stall (`Stall #3` or the kopitiam drink stall for `D1`), then onboard 7 neighboring stalls into the WhatsApp Broadcast List.
+| Phase | Entry condition | Duration | Economics target |
+| :--- | :--- | :--- | :--- |
+| **0 — Setup** | None | 5 days | RM 0 fixed burn |
+| **1A — Founder pilot** | Supplier prices locked | ≥ 2 weeks | 12–14 Stalls, RM 2,123.80–2,603.60 GMV |
+| **1B — Runner pilot** | 1A complete; gate visible | ≥ 2 weeks | RM 125.70–168.40 net |
+| **★ GATE** | **2 consecutive weeks ≥ gate** | — | Decision point |
+| **2 — Platform build** | Gate cleared | 4 weeks | Make the manual work disappear |
+| **3 — Scale** | Phase 2 stable for 4 weeks | ongoing | 5 Routes ≈ RM 3,648/mo |
+
+If the gate never clears, **Phase 2 never starts** and the Founder has lost nothing but time. That is the correct outcome of a failed experiment.
 
 ---
 
-### Phase 1: Zero-Code WhatsApp + Google Sheets Pilot (Weeks 1–4)
+## 2. Phase 0 — Setup (Days 1–5)
 
-1. **Weeks 1–2 (Founder-Driven Validation Batches #1 & #2):**
-   * **Tuesday 14:00:** Send `Script B` ("Pool Open") broadcast to Premier 101 hawkers.
-   * **Tue 14:00 – Wed 12:00:** Log incoming replies into the `Vendor_Orders` sheet tab.
-   * **Wednesday 12:00 – 12:30:** Lock pool, run `Wholesaler_Aggregator` to calculate Master Cartons ($C_{b,i}$), send `Script C` confirmation receipts to stalls, and submit the consolidated PO to the Pending wholesaler.
-   * **Thursday 13:30 – 15:30:** Founder drives to Pending Industrial Estate (~15 km round-trip, RM 12 petrol cost), picks up Master Cartons, parks at Premier 101 loading zone at 14:15 to break cartons and mark stall numbers on bundles with a black marker, delivers via trolley at 14:30, collects DuitNow QR/Cash, and sells or logs any leftover buffer bundles at 15:30.
-2. **Weeks 3–4 (Part-Time MPV Runner Transition Batches #3 & #4):**
-   * Recruit 1 part-time student/gig driver (UNIMAS/Swinburne/Politeknik) with a Perodua Alza, Proton Exora, Avanza, or fold-flat Myvi for a fixed 2-hour Thursday shift (13:30–15:30 MYT) at a flat **RM 45.00** payout.
-   * Enforce Zero-Leakage Financial Control: Founder transfers wholesale payment via DuitNow once the runner confirms carton counts at Pending; runner collects vendor payments at Premier 101 using the laminated Corporate DuitNow QR Card.
+### Days 1–2: Wholesaler lock-in
+
+Send **Script A** to three Wholesalers in Pending Industrial Estate and Demak Laut. Ask all six price questions **and Question 1**:
+
+> *"500 sets tu datang dalam SATU karton, atau DUA karton berasingan (satu tapak, satu penutup)?"*
+
+**This is the load-bearing unknown in the whole model.** It decides whether a Route is 22 or 32 physical boxes, and therefore whether a Myvi can serve it at all (`ADR-0015`). One phone call. Do it before buying anything.
+
+Record `carton_cost`, carton dimensions, and `bundles_per_master_carton` per SKU. Dimensions for `B1`, `C1`, `D1` are currently **estimates** (`carton-payload-estimates.md`); get real ones.
+
+### Day 2: Tooling
+
+* WhatsApp Business profile, broadcast list per Cluster.
+* Google Sheets workbook with four tabs: `SKU_Master`, `Stall_Orders`, `Wholesaler_Aggregator`, `Buffer_Ledger`.
+* Print 20 Pool Price Cards (Script/§2.1 of Pillar 7) and 2 payment cards.
+* **`Stall_Orders` must have `delivered` and `payment_method` columns from Batch #1.** A sheet that records only orders cannot compute Realized GP, and the gate becomes unmeasurable.
+
+### Days 3–5: Onboarding
+
+Visit strictly **14:15–16:00**. Anchor the drink Stall first. **Do not open Cluster B until Cluster A holds 6 committed Stalls** — a half-empty Cluster still costs a full Sortie.
+
+Target for Phase 1A: **6 Stalls in Premier 101 + 6–7 in Gala City**.
 
 ---
 
-### Phase 2: Automated Agent & Web Platform Engineering (Weeks 5–8)
+## 3. Phase 1A — Founder pilot (Weeks 1–2)
 
-* **Week 5 (Database & Core API):**
-  * Provision Supabase project and run the DDL and seed scripts from `09_Backend_Schema.md` (`clusters`, `vendors`, `skus`, `pool_batches`, `vendor_orders`, `v_wholesaler_aggregator`, `fn_reconcile_batch`).
-* **Week 6 (WhatsApp Cloud API & Hybrid Order Parser):**
-  * Connect Meta WhatsApp Cloud API webhook to Supabase Edge Functions.
-  * Implement the Tier 1 Regex Parser (`/\b([A-Ea-e][1-9])\s*(?:x|X|\*|-|:)?\s*(\d+)\b/g`) and Tier 2 LLM Fallback Parser with the Trilingual Synonym Dictionary (English, BM/Sarawak Malay, Mandarin/Kuching Hokkien).
-* **Week 7 (Admin Console & Mobile Runner Web App):**
-  * Build the Founder Admin Console (automated Tuesday/Wednesday broadcast cron triggers, Master Carton PO generator, and P&L tracker) and the Mobile Runner Checklist App (Pending pickup count verification, car-boot sorting guide, and stall payment status toggles).
-* **Week 8 (Parallel Shadow Testing & Cutover):**
-  * Run Batch #8 in Premier 101 with the automated webhook and Supabase database running in parallel with the Google Sheet, then retire manual sheet entry and launch Cluster #2 (**Tabuan Jaya**) and Cluster #3 (**Stutong**).
+The Founder drives, and must personally experience the two things that will decide whether this business works:
+
+1. **The negative cash weeks.** Week 1 at 12 Stalls: cash out RM 2,182 against RM 2,123.80 GMV — a **negative RM 58.20** spread, and −RM 143.20 after the Runner. That money is in the boot, not lost, but it leaves the bank account. Hold **RM 2,600** of float.
+
+2. **The read-back loop.** Log every voice order, send the read-back, and record whether the Stall confirmed. If Stalls ignore read-backs, the voice channel is dead and `ADR-0014` needs revisiting before code, not after.
+
+Weekly rhythm per Pillar 4 §1. Record in the sheet: `ordered`, `delivered`, `payment_method`, `payment_reference`, and Buffer Stock at cost.
 
 ---
 
-### Phase 3: Kuching 10-Cluster Expansion (Weeks 9–16)
+## 4. Phase 1B — Runner pilot (Weeks 3–4)
 
-* Roll out the standardized off-peak onboarding and weekly Thursday delivery cadence across all 10 target Kuching commercial clusters:
-  1. **Premier 101 / Jalan Tun Jugah** (Beachhead)
-  2. **Tabuan Jaya**
-  3. **Stutong**
-  4. **Gala City**
-  5. **MetroCity Matang**
-  6. **Satok**
-  7. **Batu Kawa**
-  8. **3rd Mile**
-  9. **7th Mile**
-  10. **BDC**
-* Layer in Phase 2+ monetization and retention features: automated weekly restock predictions based on historical stall consumption, loyalty tier discounts for consecutive weekly pool participation, tiered supplier rebates, and instant digital credit terms for verified stalls.
+Recruit one Runner with an **Avanza-class vehicle** (a Myvi works only for a 12-Stall Route with 6-Stall Clusters). Pay **RM 42.50 per Sortie, RM 85 per shift**, and **state explicitly whether petrol is included** — at ~30 km this is RM 8–10 and the difference between a viable gig and a bad one.
+
+Train on three rules only:
+
+1. Count cartons at pickup before the Founder pays. If short, say so immediately.
+2. Never change a quantity or a price. Record what happened.
+3. Every handover ends with a receipt echo. `PAID_DUITNOW` needs a proof photo.
+
+Run the real Sortie times: 13:15 pickup → 13:30–14:25 Sortie 1 → 14:40 reload → 14:55–15:50 Sortie 2 → 16:00 reconcile.
+
+---
+
+## 5. ★ The Gate Decision
+
+At the end of Week 4, read the sheet:
+
+| Result | Action |
+| :--- | :--- |
+| **Both weeks ≥ RM 1,500 GMV and ≥ RM 150 Realized GP** | Proceed to Phase 2. |
+| GMV clears but GP does not | **Margin problem.** Re-negotiate carton costs or drop the thinnest SKUs. Do not build software. |
+| GP clears but GMV does not | Volume problem. Recruit more Stalls before automating. |
+| Neither | The model does not work as designed. Revisit the Route size or the beachhead. Building Phase 2 here would automate a loss. |
+
+Record the decision and its evidence in an ADR. Do not proceed on optimism.
+
+---
+
+## 6. Phase 2 — Platform (4 weeks, after the gate)
+
+Full specification in `06_TRD.md` and `09_Backend_Schema.md`; the schema is verified executable against PostgreSQL 16.
+
+| Week | Deliverable |
+| :--- | :--- |
+| **1** | Supabase project; run the DDL, views, functions, RLS and seed from Pillar 9 **verbatim** — it is tested. |
+| **2** | WhatsApp Cloud API webhook; text pipeline (regex → synonyms → LLM). Voice pipeline **behind the read-back gate** with the Founder audio queue. |
+| **3** | Founder Console (aggregation, sortie load guard, margin guard, voice queue) and Runner app (sortie selector, pickup count, manifest, handover, receipt echo). |
+| **4** | Parallel run: one Route on paper and software simultaneously. Compare Realized GP both ways. Cut over only when they agree to the cent. |
+
+**Build order is non-negotiable:** ledger and aggregation first, messaging second, UI third. The messaging layer is the most visible and the least dangerous; the ledger is invisible and decides whether the P&L is true.
+
+---
+
+## 7. Phase 3 — Scale
+
+5 Routes × 4.333 weeks = **21.67 shifts/month**:
+
+| | GMV/mo | GP/mo | Logistics | **Net/mo** |
+| :--- | ---: | ---: | ---: | ---: |
+| 5 × 14-Stall Routes | RM 56,407 | RM 5,490 | RM 1,842 | **RM 3,648** |
+
+The old "RM 6,200/month" needs **~37 shifts ≈ 8.5 Routes** — roughly every food court in Kuching. That is a Phase 3 target, not a Phase 2 claim.
+
+Scale rule: **do not add a Route until the existing ones have cleared the gate for four consecutive weeks.** Each Route carries its own working-capital float; four failing Routes is a cash problem before it is a growth problem.
+
+---
+
+## 8. What must be true before writing any Phase 2 code
+
+| # | Unknown | Why it blocks |
+| :--- | :--- | :--- |
+| 1 | `A1`/`A2` nested or separate cartons | Changes vehicle class and payload model |
+| 2 | Real carton dimensions for `B1`, `C1`, `D1` | Sortie capacity check is only as good as `carton_geometric_liters` |
+| 3 | Petrol inside RM 42.50 | Determines real net margin |
+| 4 | Voice-note retention policy | Storing customer audio without a policy is a PDPA problem |
+| 5 | Gate cleared twice | `ADR-0009` |
+| 6 | Prepayment flow | Not needed — none exists. Do not build one. |
+
+Items 1–3 are phone calls. Item 5 is two weeks of real work. Everything else in the ten pillars is now internally consistent and testable; these six are the only things standing between the documents and a defensible build.

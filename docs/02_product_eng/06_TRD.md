@@ -1,148 +1,197 @@
 ---
 project: Sarpply
 pillar: 06_TRD
-version: 1.0-MVP-to-Phase2
-stack_mvp: WhatsApp Business App + Google Sheets Aggregator + DuitNow QR
-stack_phase2: WhatsApp Cloud API + Supabase (PostgreSQL/Edge Functions) + Next.js Web Portal + LLM Fallback Parser
+version: 1.1-MVP-to-Phase2
+stack_mvp: WhatsApp Business App + Google Sheets Aggregator + Static DuitNow QR
+stack_phase2: WhatsApp Cloud API + Supabase (PostgreSQL/Edge Functions) + Next.js Admin/Runner web + LLM fallback parser
 timezone: Asia/Kuching (MYT / UTC+8)
+supersedes: v1.0 (hardcoded per-state cron jobs, single-trip fulfilment, current_buffer_bundles counter, real-time DuitNow)
 ---
 
 # Sarpply — Pillar 6: Technical Requirements Document (TRD)
 
-## 1. System Architecture Evolution
+> **Terminology** is defined in `GLOSSARY.md`. This document obeys the ADRs; where it appears to contradict one, the ADR wins.
 
-### 1.1 Phase 1: Zero-Code Pilot Stack (Weeks 1–4)
+## 1. Architecture
 
-* **Messaging Layer:** WhatsApp Business Mobile/Desktop App utilizing Broadcast Lists and Quick Replies (`Script A`, `Script B`, `Script C`).
-* **Compute & Storage Layer:** Google Sheets Master Workbook containing three relational tabs: `SKU_Master`, `Vendor_Orders`, and `Wholesaler_Aggregator`.
-* **Payment Layer:** Static Corporate DuitNow QR code printed on a laminated card + physical Cash on Delivery (COD).
+### 1.1 Phase 1 — Zero-code pilot (Weeks 1–4)
 
-### 1.2 Phase 2: Automated Agent & Platform Stack (Week 5+)
+* **Messaging:** WhatsApp Business app, broadcast lists and quick replies (Scripts B/C/D).
+* **Compute/storage:** Google Sheets workbook — `SKU_Master`, `Stall_Orders`, `Wholesaler_Aggregator`, `Buffer_Ledger`.
+* **Payment:** static corporate DuitNow QR on a laminated card, plus cash. **No acquiring fee, no webhook, no transaction feed** (`ADR-0001`).
+
+The pilot must record **`delivered_*` alongside `ordered_*`** from Batch #1. A pilot that logs only what was ordered cannot produce Realized GP, and the gate would then be measured on forecasts (`ADR-0010`).
+
+### 1.2 Phase 2 — Platform
 
 ```
-+-----------------------------------------------------------------------+
-|                    HAWKER STALLS (Premier 101, etc.)                  |
-|         WhatsApp Client (EN / BM / Sarawak Malay / ZH / Hokkien)      |
-+-----------------------------------+-----------------------------------+
-                                    |
-                                    v (HTTPS Webhook / Meta Graph API)
-+-----------------------------------------------------------------------+
-|                SUPABASE EDGE FUNCTIONS / API GATEWAY                  |
-|  +-----------------------------+   +-------------------------------+  |
-|  |  1. Fast Regex Order Parser |-->| 2. LLM Synonym Fallback Agent |  |
-|  |  /\b([A-Ea-e][1-9])...      |   | (Trilingual Dictionary JSON)  |  |
-|  +-----------------------------+   +-------------------------------+  |
-+-----------------------------------+-----------------------------------+
-                                    |
-                                    v
-+-----------------------------------------------------------------------+
-|                   SUPABASE POSTGRESQL DATABASE                        |
-|  Tables: clusters | vendors | skus | pool_batches | vendor_orders     |
-|  Engine: Master Carton Ceiling & Carryover Buffer Reconciliation      |
-+-----------------+-----------------------------------+-----------------+
-                  |                                   |
-                  v                                   v
-+-----------------------------------+   +-------------------------------+
-|    FOUNDER / ADMIN WEB CONSOLE    |   |   MPV RUNNER MOBILE WEB APP   |
-| - Wednesday 12:00 Cutoff Trigger  |   | - Pending Pickup Verification |
-| - Wholesaler PO PDF/WA Generator  |   | - Boot Cross-Dock Sort List   |
-| - DuitNow Transfer Authorization  |   | - Stall Delivery & QR Toggles |
-+-----------------------------------+   +-------------------------------+
+                 ┌──────────────────────────────────────────┐
+   Stalls ──────▶│ WhatsApp Cloud API webhook               │
+   (text/voice)  │  ├─ Tier 1  regex                        │
+                 │  ├─ Tier 2  synonym pass                 │
+                 │  └─ Tier 3  LLM → strict JSON            │
+                 │  └─ VOICE → draft + read-back (never     │
+                 │            auto-commits; ADR-0014)       │
+                 └────────────────┬─────────────────────────┘
+                                  ▼
+                 ┌──────────────────────────────────────────┐
+                 │ Supabase / PostgreSQL                    │
+                 │  routes · clusters · stalls · skus       │
+                 │  route_batches · stall_orders            │
+                 │  stock_movements (immutable ledger)      │
+                 │  vehicles · wholesaler_po_lines          │
+                 └───────┬──────────────────────┬───────────┘
+                         ▼                      ▼
+              ┌────────────────────┐  ┌──────────────────────┐
+              │ Founder Console    │  │ Runner web app       │
+              │ · margin guards    │  │ · sortie manifest    │
+              │ · PO + cash forecast│ │ · attest payment     │
+              │ · voice audio queue│  │ · receipt echo       │
+              │ · sortie load check│  │ · shift-scoped auth  │
+              └────────────────────┘  └──────────────────────┘
 ```
+
+**Two architectural rules that are not negotiable:**
+
+1. **Buffer Stock is a ledger, not a counter.** `stock_movements` is append-only with idempotency keys; balance is a derived view (`ADR-0007`).
+2. **Timing is data, not cron.** A single dispatcher polls every 15 minutes and fires due transitions read from `routes` (`ADR-0005`).
 
 ---
 
-## 2. Hybrid WhatsApp Order Parsing Engine (Phase 2 Spec)
+## 2. Order ingestion
 
-When a registered vendor sends a WhatsApp text reply while their cluster's batch status is `POOL_OPEN` or `COLLECTING_ORDERS`, the webhook processor executes a two-tier extraction pipeline:
-
-### 2.1 Tier 1: Deterministic Regex Pass (< 5ms latency)
-
-Executes against structured alphanumeric inputs such as `"A1 x 3, C1 x 2"` or `"a1 3, b1 2"`:
+### 2.1 Tier 1 — regex (text only)
 
 ```regex
 /\b([A-Ea-e][1-9])\s*(?:x|X|\*|-|:)?\s*(\d+)\b/g
 ```
 
-* **Capture Group 1:** Uppercase normalized `sku_code` (validated against active catalog codes `A1`, `A2`, `B1`, `C1`, `D1`, `E1`).
-* **Capture Group 2:** Positive integer `bundles_ordered` ($\ge 1$).
+Group 1 → upper-cased `sku_code`, validated against the active catalogue. Group 2 → `ordered_bundles ≥ 1`.
 
-### 2.2 Tier 2: Trilingual LLM Fallback Pass (< 1,500ms latency)
+### 2.2 Tier 2 — synonym pass
 
-If Tier 1 returns zero matches on natural-language inputs (e.g., *"Boss bagi bekas kecil 3 bundle dengan plastik 2"* or *"小盒 3, 塑胶袋 2"*), the webhook invokes a lightweight LLM prompt injected with the **Trilingual Synonym Dictionary**:
+Token map per `05_PRD.md` §4 / `02_Go_To_Market_Strategy.md` §5. Handles `"bekas kecil 3 bundle"`, `"pakai plastik 9x11 dua"`, `"小盒 3"`. Hokkien tokens are matched **on the transcript**, never used to select an ASR model.
 
-* **Canonical Token Mapping Rules:**
-  * `A1` $\leftarrow$ EN: `a1`, `650ml`, `small box`, `normal box`, `mee box` | BM: `bekas kecil`, `bekas biasa`, `tapau 650`, `kotak mee` | ZH/Hokkien: `小盒`, `普通打包盒`, `面盒`, `650盒`, `tah-pau-ah`.
-  * `A2` $\leftarrow$ EN: `a2`, `750ml`, `big box`, `large box`, `rice box` | BM: `bekas besar`, `tapau besar`, `tapau 750`, `kotak nasi` | ZH/Hokkien: `大盒`, `大号打包盒`, `饭盒`, `750盒`.
-  * `B1` $\leftarrow$ EN: `b1`, `brown paper`, `wax paper`, `wrapper` | BM: `kertas bungkus`, `kertas coklat`, `kertas minyak`, `kertas nasi` | ZH/Hokkien: `油纸`, `打包纸`, `饭纸`, `brown paper`.
-  * `C1` $\leftarrow$ EN: `c1`, `plastic bag`, `singlet bag`, `9x11` | BM: `plastik tapau`, `plastik tangkai`, `plastik 9x11`, `beg plastik` | ZH/Hokkien: `塑胶袋`, `手提袋`, `打包袋`, `9x11袋`.
-  * `D1` $\leftarrow$ EN: `d1`, `creamer`, `condensed milk`, `milk tin` | BM: `susu manis`, `krimer`, `susu tin`, `susu pekat` | ZH/Hokkien: `炼奶`, `甜奶`, `奶水`, `茶水奶`.
-  * `E1` $\leftarrow$ EN: `e1`, `dish soap`, `detergent`, `5l soap` | BM: `sabun pinggan`, `sabun cuci`, `sabun 5l`, `pencuci pinggan` | ZH/Hokkien: `洗碗精`, `洗碗水`, `大桶肥皂`.
+### 2.3 Tier 3 — LLM fallback
 
-* **Strict Output Schema:**
+Input: message + synonym dictionary. Output: strict JSON only.
 
 ```json
-{
-  "orders": [
-    { "sku_code": "A1", "bundles_ordered": 3 },
-    { "sku_code": "C1", "bundles_ordered": 2 }
-  ],
-  "needs_clarification": false
-}
+{ "orders": [{ "sku_code": "A1", "bundles_ordered": 3 }], "needs_clarification": false }
 ```
 
-* **Ambiguity Handling:** If a vendor writes *"Bagi bekas tapau 3 bundle"* without specifying size (`650ml` vs `750ml`), the LLM sets `"needs_clarification": true` and triggers an automated bilingual reply asking the vendor to choose `A1` (650ml) or `A2` (750ml).
+`"Bagi bekas tapau 3 bundle"` (no size) must return `needs_clarification: true` and trigger the A1/A2 prompt. The model may never invent a quantity.
+
+### 2.4 Voice path — a different pipeline, deliberately
+
+| Step | Behaviour |
+| :--- | :--- |
+| 1 | Voice note received → stored, transcribed |
+| 2 | Creates `UNCONFIRMED_VOICE_DRAFT`. **Does not touch `stall_orders`.** |
+| 3 | One-line read-back in the Stall's `written_language` (Script D) |
+| 4 | Draft appears in the Founder audio queue (~10–14 clips/week, < 90 s total) |
+| 5 | Commits **only** on affirmative token (`OK`/`YA`/`YES`/`1`/`好`/`对`) or Founder approval |
+| 6 | Unconfirmed drafts expire at Cutoff without committing |
+
+**Why:** published Hokkien ASR reaches 96.6% character error rate — unusable for quantity capture — and no commercial provider ships a real Hokkien locale (`docs/02_product_eng/asr-feasibility-kuching.md`). An unreviewed transcription writing to the table a Wholesaler PO is built from is a RM 135-per-carton error class. Read-back costs one message.
+
+### 2.5 Idempotency
+
+Text orders upsert on `(route_batch_id, stall_id, sku_code, order_type)`. Voice drafts carry a `source_message_id` unique key so a redelivered webhook cannot create a second draft.
 
 ---
 
-## 3. Core Mathematical & Aggregation Specifications
+## 3. Money and stock
 
-For any weekly pool batch $b$ and SKU $i \in \{\text{A1, A2, B1, C1, D1, E1}\}$:
+### 3.1 Carton calculation
 
-1. **Total Vendor Bundles Ordered ($Q_{b,i}$):**
+$$C_{r,i} = \max\left(0,\ \left\lceil \frac{Q_{r,i} - S_{i,\text{prev}}}{M_i} \right\rceil\right)$$
 
-$$Q_{b,i} = \sum_{v=1}^{n} q_{b,i,v}$$
+$Q_{r,i}$ = Ordered Bundles for the Route at Cutoff. $S_{i,\text{prev}}$ = ledger balance. $M_i$ = `bundles_per_master_carton`.
 
-where $q_{b,i,v}$ is the bundle quantity of SKU $i$ ordered by vendor $v$ in batch $b$.
+### 3.2 Buffer Stock (derived)
 
-2. **Master Cartons to Purchase from Wholesaler ($C_{b,i}$):**
+$$S_{i,\text{end}} = S_{i,\text{prev}} + \text{received}_{r,i} \cdot M_i - \sum_{s \in r} \text{delivered}_{s,i}$$
 
-$$C_{b,i} = \max\left(0, \left\lceil \frac{Q_{b,i} - S_{i,\text{prev}}}{M_i} \right\rceil\right)$$
+Note **received**, not calculated: a Wholesaler shortfall must flow through, not be papered over (`ADR-0011`).
 
-where $M_i$ is `bundles_per_carton` (`bundles_per_master_carton`) and $S_{i,\text{prev}}$ is the carryover buffer stock (`current_buffer_bundles`) held in the vehicle boot from the prior batch.
+### 3.3 Three margin figures
 
-3. **Ending Buffer Stock ($S_{b,i,\text{end}}$):**
-
-$$S_{b,i,\text{end}} = (C_{b,i} \times M_i) + S_{i,\text{prev}} - Q_{b,i}$$
-
-Updated into `skus.current_buffer_bundles` upon batch reconciliation on Thursday at 15:30 MYT.
-
-4. **Batch Net Contribution Margin ($\text{NCM}_b$):**
-
-$$\text{NCM}_b = \sum_{i} \left( Q_{b,i} \times (P_{i,\text{pool}} - \text{Cost}_{i,\text{bundle}}) \right) - L_b$$
-
-where $\text{Cost}_{i,\text{bundle}} = \frac{\text{wholesaler\_carton\_cost}_i}{M_i}$ and $L_b$ is the batch logistics cost (`RM 12.00` when `dispatch_mode = 'FOUNDER'`, or `RM 45.00` when `dispatch_mode = 'RUNNER'`).
-
----
-
-## 4. Scheduled Cron Jobs & State Machine Transitions
-
-All cron schedules execute in `Asia/Kuching` (`UTC+8`):
-
-| Cron Expression (MYT) | Target State | Automated System Task |
+| Figure | Formula | Use |
 | :--- | :--- | :--- |
-| `0 14 * * 2` (Tue 14:00) | `POOL_OPEN` | Create new `pool_batches` record for upcoming Thursday; send WhatsApp Broadcast (`Script B`) to cluster vendors. |
-| `1 14 * * 2` (Tue 14:01) | `COLLECTING_ORDERS` | Open webhook listener to accept/upsert vendor order lines until Wednesday 12:00. |
-| `0 12 * * 3` (Wed 12:00) | `POOL_LOCKED` | Reject late order mutations without admin override; compute $Q_{b,i}$ and $C_{b,i}$ across all 6 SKUs. |
-| `30 12 * * 3` (Wed 12:30) | `PO_SUBMITTED` | Dispatch WhatsApp Confirmation Receipts (`Script C`) to ordering stalls; transmit consolidated Master Carton PO to Pending wholesaler. |
-| `30 13 * * 4` (Thu 13:30) | `WHOLESALER_PICKUP` | Unlock Runner Pickup Checklist; prompt founder to release DuitNow payment to wholesaler upon carton count confirmation. |
-| `15 14 * * 4` (Thu 14:15) | `CROSS_DOCK_SORT` | Render car-boot bundle-splitting manifest sorted by `stall_number`. |
-| `30 14 * * 4` (Thu 14:30) | `STALL_DELIVERY` | Enable stall-side handover tracking and `PAID_DUITNOW` / `PAID_CASH` status toggles. |
-| `30 15 * * 4` (Thu 15:30) | `BATCH_RECONCILED` | Finalize payment totals, deduct cash collected from runner's RM 45 payout (or verify transfer), and update `current_buffer_bundles` ($S_{b,i,\text{end}}$). |
+| **Forecast GP** | `Σ ordered × (locked_price − locked_cost)` | Expectation, known at Cutoff |
+| **Realized GP** | `Σ delivered × (locked_price − locked_cost)` **+ Spot Sales** | **The gate** |
+| **Net Batch Cash Flow** | `collected − cartons_received × carton_cost − sortie_count × runner_rate` | Float planning |
+
+Identity: `Realized GP − closing Buffer Stock at cost = Net Batch Cash Flow`. Any report violating it has a ledger bug (`ADR-0010`).
+
+### 3.4 Sortie capacity
+
+$$\sum_{i \in \text{sortie}} \frac{C_i \cdot L_i}{0.80} \le V_{\max}$$
+
+$L_i$ = `carton_geometric_liters`, $V_{\max}$ = `vehicles.max_cargo_liters` (Myvi 800, Avanza 1000). **This is a hard publish-time guard, not a warning** (`ADR-0016`).
+
+### 3.5 Two-stage margin guard
+
+| Stage | When | Check |
+| :--- | :--- | :--- |
+| **Stage 1** | Tue 13:30, before broadcast | Projected GP per Route at last week's mix ≥ RM 150; else `ADMIN_PRICING_ALERT` |
+| **Stage 2** | Wed 12:00, at Cutoff | Real mix projected GP ≥ RM 150; else flag before the PO goes out |
+
+The gate breaks at **+4.16%** carton cost, so a 5% Wholesaler move must be caught before the broadcast, not at pickup.
 
 ---
 
-## 5. Security, Financial Controls & Reliability
+## 4. State machine and the dispatcher
 
-* **Zero-Leakage Runner Protocol:** Runners never handle wholesale purchase cash. The founder pays the Pending wholesaler directly via online banking/DuitNow only after the runner verifies the physical Master Carton count at the loading bay. For vendor collections, runners present a laminated **Sarpply Corporate DuitNow QR Card** tied directly to the founder's corporate bank account; any physical cash collected is offset against the runner's RM 45.00 shift payout or transferred immediately at 15:30 MYT reconciliation.
-* **Order Upsert Idempotency:** If a vendor sends a second message before Wednesday 12:00 PM (e.g., updating `A1` from 2 bundles to 3 bundles), the webhook parser upserts on `(batch_id, vendor_id, sku_code)` and sends an updated confirmation preview so duplicate lines are never double-counted.
+### 4.1 States
+
+`OPEN_FOR_ORDERS → CLOSED_AT_CUTOFF → PO_SUBMITTED → GOODS_RECEIVED → IN_TRANSIT (per Sortie) → DELIVERED → RECONCILED`, plus `CANCELLED_LOW_VOLUME`.
+
+`CANCELLED_LOW_VOLUME` exists **only** for demand reasons. There is no stock-risk reason to cancel: the goods are non-perishable, and a Wholesaler is contacted on Wednesday with 48.5 hours of notice.
+
+`POOL_OPEN`, `COLLECTING_ORDERS`, `POOL_LOCKED`, `WHOLESALER_PICKUP`, `CROSS_DOCK_SORT`, `STALL_DELIVERY` and `BATCH_RECONCILED` are deleted — they encoded a single-Cluster rhythm and duplicated states that are orthogonal.
+
+### 4.2 Dispatcher
+
+One job, every 15 minutes, `Asia/Kuching`:
+
+```text
+for each route where a transition is due (comparing now() against routes.*):
+    if not already fired for this (route_batch, transition):
+        fire; record (route_batch_id, transition, fired_at) with a UNIQUE key
+```
+
+Every firing is recorded and idempotent, so a crash-loop cannot re-broadcast or re-submit a PO. A transition may fire up to 15 minutes late — acceptable across a 22-hour ordering window, unacceptable in the 30-minute `CLOSED_AT_CUTOFF → PO_SUBMITTED` gap, which is why the dispatcher interval must be **≤ 15 min and the gap ≥ 30 min** (`ADR-0005`).
+
+There is **no hardcoded cron table**. The old v1.0 table (`0 14 * * 2` … `30 15 * * 4`) hardcoded one Route's Thursday into the deployment; onboarding a Route with a Monday cutoff would have required a code change.
+
+| Transition | Offset from Cutoff | Owner |
+| :--- | :--- | :--- |
+| `OPEN_FOR_ORDERS` | −22 h (Tue 14:00) | dispatcher → broadcast |
+| `CLOSED_AT_CUTOFF` | 0 (Wed 12:00) | dispatcher; freeze orders + prices |
+| `PO_SUBMITTED` | +30 min | Founder approves PO |
+| `GOODS_RECEIVED` | +47.25 h (Thu 13:15) | Runner records `cartons_received` |
+| `DELIVERED` | +47.5 h → +51.8 h (2 Sorties) | Runner per Stall |
+| `RECONCILED` | +52 h (Thu 16:00) | Founder |
+
+---
+
+## 5. Security and financial control
+
+* **Least privilege** (`ADR-0012`): a Runner session is shift-scoped. The Runner may set `delivered_bundles`, `fulfilment_status`, `payment_status`, and record Spot Sales. The Runner **may not** change a Preorder quantity, `unit_price_locked`, a past batch, or void a payment.
+* **`PAID_DUITNOW` requires `payment_proof_url`** — enforced by constraint.
+* **No Wholesaler cash in Runner hands.** The Founder pays the Wholesaler by DuitNow once the Runner confirms the carton count at the loading bay.
+* **Receipt echo on every handover**, naming amount and recorded method. This is the audit mechanism; a static QR has no other one.
+* **RLS**: if the frontmatter claims row-level security, policies must actually exist. v1.0 claimed RLS and defined zero policies.
+
+---
+
+## 6. Known gaps to close before Phase 2 code
+
+| Gap | Owner | Blocking? |
+| :--- | :--- | :--- |
+| `A1`/`A2` nested vs separate lid cartons | Founder → Wholesaler (Script A Q1) | **Yes** — changes vehicle choice |
+| Petrol included in RM 42.50/sortie? | Founder → Runner hiring | No, but affects net |
+| Voice-note retention/PDPA policy | Founder | Yes, before storing audio |
+| Stage 1 / Stage 2 threshold values | Founder | No — defaults above |

@@ -1,179 +1,228 @@
 ---
 project: Sarpply
 pillar: 07_UI_UX_Design
-version: 1.0-MVP-to-Phase2
-primary_vendor_interface: WhatsApp Business + Physical Laminated Cards
-secondary_interfaces: Mobile-First Runner Web App + Founder Admin Console
-design_philosophy: Zero-App-Install Hawker UX, High-Contrast Kitchen Readability
+version: 1.1-MVP-to-Phase2
+primary_stall_interface: WhatsApp Business + laminated physical cards
+secondary_interfaces: Runner web app (mobile-first) + Founder Admin Console
+design_philosophy: Zero-install for Stalls, high-contrast for kitchens, one-thumb for Runners
+supersedes: v1.0 (2:30 PM single drop, RM 45 shift, 8-stall console, "Verified on Hawker Screen" DuitNow claim)
 ---
 
-# Sarpply — Pillar 7: UI/UX Design Specification
+# Sarpply — Pillar 7: UI/UX Design
 
-## 1. UX Design Principles for Kuching Kopitiam Environments
+> Terminology per `GLOSSARY.md`. Times are MYT. Numbers match `03_Unit_Economics.md`.
 
-1. **Zero-Install Conversational UX for Hawkers:** Independent hawkers operating 8x8ft stalls will not download new apps, remember passwords, or browse complex e-commerce catalogs with wet or greasy hands. 100% of vendor interactions happen inside **WhatsApp** using 2-character SKU codes (`A1`–`E1`) or voice/text natural language.
-2. **Tactile & Laminated Physical Touchpoints:** Field onboarding (2:15 PM–4:00 PM) and Thursday delivery (2:30 PM) rely on physical samples (SKU `A1` 650ml box) and water/oil-resistant laminated A5 cards.
-3. **One-Thumb Runner Ergonomics:** The Phase 2 Runner Web App is designed for high-glare outdoor carpark conditions at Pending Industrial Estate (1:30 PM) and Premier 101 (2:15 PM), featuring oversized tap targets (minimum `56px` height) and high-contrast status badges.
+## 1. Principles
 
----
-
-## 2. Physical Touchpoint Wireframes (MVP Weeks 1–4)
-
-### 2.1 Laminated 1-Page Bilingual Pool Price Card (A5 Front — Left at Stall)
-
-```
-+-----------------------------------------------------------------------+
-|  📦 SARPPLY KUCHING — POOL BORONG PREMIER 101                         |
-|  Harga Kilang / Master Carton • Beli 1 Bundle Pun Dapat Harga Borong! |
-+-----------------------------------------------------------------------+
-|  KOD | BARANG (6 SKU UTAMA)                | HARGA KEDAI | HARGA POOL |
-| -----+-------------------------------------+-------------+----------- |
-| [A1] | Bekas Tapau PP 650ml (50 set)       |  RM 16.50   |  RM 15.00  |
-|      | 650ml 塑料打包盒 (四方)               |             | (Jimat 9%) |
-| [A2] | Bekas Tapau PP 750ml Besar (50 set) |  RM 18.00   |  RM 16.50  |
-|      | 750ml 大号打包盒                      |             | (Jimat 8%) |
-| [B1] | Kertas Bungkus Coklat Besar (250s)  |  RM 10.80   |  RM  9.50  |
-|      | 大号打包油纸                          |             |(Jimat 12%) |
-| [C1] | Plastik Tapau HM 9x11 (5 pek)       |  RM 13.50   |  RM 12.20  |
-|      | 9x11 手提塑胶袋                       |             |(Jimat 10%) |
-| [D1] | Susu Krimer Manis 500g (24 tin)     |  RM 73.00   |  RM 69.50  |
-|      | 500g 炼奶 (茶水档专用)                 |             | (Jimat 5%) |
-| [E1] | Sabun Cuci Pinggan Pekat 5L (1 btl) |  RM 15.00   |  RM 13.00  |
-|      | 5L 大桶洗碗精                         |             |(Jimat 13%) |
-+-----------------------------------------------------------------------+
-|  ⏰ JADUAL POOL PREMIER 101:                                          |
-|  • Order Tutup : Setiap RABU, 12:00 Tengah Hari                       |
-|  • Hantar Terus: Setiap KHAMIS, 2:30 Petang (PERCUMA ke gerai!)       |
-|  • Bayaran     : Cash atau Scan DuitNow QR masa barang sampai sahaja  |
-|                                                                       |
-|  +---------------+  👈 IMBAS QR UNTUK MASUK POOL WHATSAPP PREMIER 101 |
-|  |  [WHATSAPP]   |     Atau WhatsApp terus: "A1 x 3, C1 x 2"          |
-|  |  [ QR CODE]   |     Gerai #3 dah join — jom kumpul order bersama!  |
-|  +---------------+                                                    |
-+-----------------------------------------------------------------------+
-```
-
-*Design references:* Pricing, SKUs, trilingual names, savings percentages, schedule, and Anchor Stall hook derived directly from the catalog and GTM playbook.
-
-### 2.2 Laminated Runner Corporate DuitNow QR Card (A5 Back — Handover Tool)
-
-```
-+-----------------------------------------------------------------------+
-|  💳 BAYARAN RASMI SARPPLY (PREMIER 101 POOL)                          |
-|  Sila bayar semasa barang sampai di gerai (Khamis 2:30 PM)            |
-+-----------------------------------------------------------------------+
-|                                                                       |
-|                     +---------------------------+                     |
-|                     |                           |                     |
-|                     |     [ DUITNOW QR CODE ]   |                     |
-|                     |   Akaun Korporat Sarpply  |                     |
-|                     |                           |                     |
-|                     +---------------------------+                     |
-|                                                                       |
-|   ✅ Langkah 1: Semak bilangan bundle di gerai anda.                  |
-|   ✅ Langkah 2: Scan DuitNow QR di atas ATAU bayar Tunai (Cash).      |
-|   ✅ Langkah 3: Tunjuk skrin resit kepada Runner Sarpply.             |
-+-----------------------------------------------------------------------+
-```
-
-*Design references:* Supports the zero-leakage financial control protocol where stalls scan a laminated Corporate DuitNow QR linked directly to the founder's bank account.
+1. **Zero-install for Stalls.** No app, no password, no catalogue to browse with greasy hands. Everything happens in WhatsApp, by text or voice note.
+2. **Physical touchpoints are water- and oil-resistant.** Laminated A5 cards survive a wok kitchen.
+3. **One-thumb for Runners.** The Runner is standing in a carpark at 13:15 with the sun behind the screen. Minimum tap target **56 px**, status conveyed by colour *and* text (never colour alone).
+4. **Never show the Runner a number they can change.** Order quantities and prices are read-only in the Runner app. It records what happened; it does not decide anything.
 
 ---
 
-## 3. Conversational UI Specifications (WhatsApp Flows)
+## 2. Physical touchpoints
 
-### 3.1 Tuesday 14:00 Broadcast UI (`POOL_OPEN`)
+### 2.1 Pool Price Card (A5, front — left at the Stall)
 
-* Uses `Script B` with clear emoji visual hierarchy (`📦`, `✅`, `👇`), explicit SKU bracket tags (`[A1]`–`[E1]`), and a single copy-pasteable reply example (`"A1 x 3, C1 x 2, E1 x 1"`).
+```
+┌───────────────────────────────────────────────────────────────┐
+│  📦 SARPPLY KUCHING — POOL BORONG                             │
+│  Harga Karton • Beli ikut bundle, bayar harga borong          │
+├───────────────────────────────────────────────────────────────┤
+│  KOD │ BARANG                        │ KEDAI   │ POOL         │
+│ ─────┼───────────────────────────────┼─────────┼────────────  │
+│ [A1] │ Bekas Tapau PP 650ml (50 set) │ RM16.50 │ RM15.00  9%  │
+│ [A2] │ Bekas Tapau PP 750ml (50 set) │ RM18.00 │ RM16.50  8%  │
+│ [B1] │ Kertas Bungkus Besar (250)    │ RM10.80 │ RM 9.50 12%  │
+│ [C1] │ Plastik Tapau 9x11 (5 pek)    │ RM13.50 │ RM12.20 10%  │
+│ [D1] │ Susu Krimer Manis 500g (24)   │ RM73.00 │ RM69.50  5%  │
+│ [E1] │ Sabun Cuci Pinggan 5L         │ RM15.00 │ RM13.00 13%  │
+├───────────────────────────────────────────────────────────────┤
+│  ⏰ Order tutup : RABU 12:00 tengah hari                      │
+│  🚚 Hantar      : KHAMIS petang (PERCUMA ke gerai)            │
+│  💵 Bayar       : Cash atau DuitNow QR masa barang sampai     │
+│  ❌ Tak perlu bayar apa-apa hari ni                           │
+├───────────────────────────────────────────────────────────────┤
+│   ┌────────────┐                                              │
+│   │  WHATSAPP  │  Balas: "A1 x 3, C1 x 2"                     │
+│   │  QR CODE   │  Atau hantar voice note — kami baca balik.   │
+│   └────────────┘                                              │
+└───────────────────────────────────────────────────────────────┘
+```
 
-### 3.2 Instant Automated Clarification Prompt (Phase 2 Bot UI)
+The card carries **only** prices, schedule and the QR. No "8 stalls", no "RM 2,000", no penetration targets — a Stall does not need Sarpply's internal economics and printing them invites the wrong question.
 
-When a hawker sends an ambiguous message (e.g., *"Boss besok hantar bekas tapau 4 bundle"*), the bot responds within 2 seconds:
+### 2.2 Payment Card (A5, back — handover tool)
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│  💳 BAYARAN SARPPLY                                           │
+│  Bayar masa barang sampai di gerai                            │
+├───────────────────────────────────────────────────────────────┤
+│                 ┌─────────────────────────┐                   │
+│                 │     [ DUITNOW QR ]      │                   │
+│                 │   Akaun Korporat Sarpply│                   │
+│                 └─────────────────────────┘                   │
+│                                                               │
+│  1. Semak bilangan bundle di gerai anda                       │
+│  2. Scan DuitNow QR di atas ATAU bayar Tunai                  │
+│  3. Tunggu resit WhatsApp daripada Sarpply                    │
+│                                                               │
+│  ⚠️ Resit WhatsApp ialah bukti bayaran anda.                  │
+│     Kalau resit tak betul, balas terus mesej itu.             │
+└───────────────────────────────────────────────────────────────┘
+```
+
+Step 3 changed from v1.0's "show the screen to the Runner". The Runner cannot verify a DuitNow payment — there is no feed to verify it against (`ADR-0001`). What protects the Stall is the receipt echo, so the card says so and tells them how to dispute it.
+
+---
+
+## 3. Conversational UI
+
+### 3.1 Tuesday 14:00 broadcast (`OPEN_FOR_ORDERS`)
+
+Script B. Emoji hierarchy, bracketed SKU tags, one copy-paste example. Ends with the voice instruction so the option is visible to a Stall that cannot type comfortably.
+
+### 3.2 Ambiguity prompt
 
 ```text
-Hi Boss! Untuk Bekas Tapau 4 bundle, Boss nak saiz yang mana satu?
-👉 Balas *A1* untuk 650ml Biasa (RM 15.00/bundle)
-👉 Balas *A2* untuk 750ml Besar (RM 16.50/bundle)
+Boss, untuk bekas tapau 4 bundle — saiz mana satu?
+👉 A1 = 650ml (RM 15.00)
+👉 A2 = 750ml (RM 16.50)
+Balas A1 atau A2 sahaja.
 ```
 
-*Design references:* Maps ambiguous natural language back to canonical SKUs `A1` and `A2`.
+### 3.3 Voice read-back (Script D) — the most important message in the product
 
-### 3.3 Wednesday 12:30 Confirmation Receipt UI (`PO_SUBMITTED`)
+```text
+🎤 Saya dengar: A1 tiga bundle, C1 dua bundle. Jumlah RM 69.40.
+Betul? Balas OK. Kalau salah, taip semula.
+```
 
-* Uses `Script C` displaying `✅ ORDER DISAHKAN (CONFIRMED)`, itemized bundle counts and subtotals, `Penghantaran (Delivery) = PERCUMA (Premier 101 Pool)`, and bold `JUMLAH PERLU DIBAYAR ESOK` via `Cash / DuitNow QR`.
+Rules the UI must enforce:
+
+* Read-back is **one message**, never a form.
+* Sent in the Stall's `written_language`, even when the note was spoken in Hokkien.
+* Only `OK`, `YA`, `YES`, `1`, `好`, `对` commit. A reply of `"ok kot"` or `"ya ya"` followed by other text does **not** auto-commit — it goes to the Founder queue.
+
+### 3.4 Wednesday 12:30 confirmation
+
+Script C. Shows itemised Bundles, total, payment method, and — new — the **delivery window for that Stall's Cluster**, because a Route now has two Sorties and a Gala City Stall must not expect a Premier 101 time.
 
 ---
 
-## 4. Phase 2 Web Interfaces (Wireframes)
+## 4. Runner web app
 
-### 4.1 Mobile-First MPV Runner Web App (Thursday 1:30 PM – 3:30 PM Shift)
-
-```
-+-------------------------------------------------------------------+
-| 🚐 SARPPLY RUNNER • Batch #04 (Premier 101)         Thu 14:15 MYT |
-| Shift Payout: RM 45.00 | Status: [2. CROSS-DOCK SORT]             |
-+-------------------------------------------------------------------+
-| [Step 1: Pickup ✅]  [Step 2: Boot Sort 🔵]  [Step 3: Deliver ⚪]  |
-+-------------------------------------------------------------------+
-| 🔪 CAR BOOT CARTON SPLITTING CHECKLIST (Mark Stall # with Marker) |
-|                                                                   |
-| 📦 [A1] PP Box 650ml (Opened: 3 Cartons = 30 Bundles)             |
-|    ├── Write "STALL #03" on 4 bundles                      [ ✓ ]  |
-|    ├── Write "STALL #07" on 3 bundles                      [ ✓ ]  |
-|    ├── Write "STALL #12" on 5 bundles                      [   ]  |
-|    └── 📥 Keep 2 surplus bundles in boot (Buffer Stock)           |
-|                                                                   |
-| 📦 [C1] Singlet Bag 9x11 (Opened: 2 Cartons = 20 Bundles)         |
-|    ├── Write "STALL #03" on 2 bundles                      [ ✓ ]  |
-|    └── Write "STALL #15" on 3 bundles                      [   ]  |
-+-------------------------------------------------------------------+
-|        [ PROCEED TO STALL DELIVERY (14:30 MYT) -> ]               |
-+-------------------------------------------------------------------+
-```
-
-### 4.2 Runner Stall-Side Handover Modal (Step 3: 14:30 MYT)
+### 4.1 Sortie selector (new — v1.0 had none)
 
 ```
-+-------------------------------------------------------------------+
-| 📍 STALL #03 — Ah Seng Kolok Mee (Premier 101)                    |
-+-------------------------------------------------------------------+
-| Deliver Items:                                                    |
-| • [A1] Bekas Tapau 650ml x 4 bundles                   RM 60.00   |
-| • [C1] Plastik Tapau 9x11 x 2 bundles                  RM 24.40   |
-| ----------------------------------------------------------------- |
-| TOTAL TO COLLECT:                                      RM 84.40   |
-|                                                                   |
-| Select Payment Received:                                          |
-|  ( • ) 📲 Paid via DuitNow QR (Verified on Hawker Screen)         |
-|  (   ) 💵 Paid via Cash (Runner holds RM 84.40 cash)              |
-|  (   ) ⚠️ Stall Closed / Uncollected (Return to Car Boot Buffer)  |
-|                                                                   |
-|              [ ✅ CONFIRM HANDOVER & NEXT STALL ]                 |
-+-------------------------------------------------------------------+
+┌───────────────────────────────────────────────────────────┐
+│ 🚐 SARPPLY RUNNER — Route: Premier 101 + Gala City        │
+│ Shift: Thu 13:15–16:00 · RM 42.50/Sortie (RM 85.00)       │
+├───────────────────────────────────────────────────────────┤
+│  [ SORTIE 1 ]  Premier 101 · 7 Stalls · 869 L             │
+│  [ SORTIE 2 ]  Gala City   · 7 Stalls · 778 L             │
+│                                                           │
+│  Vehicle: Avanza (max 1,000 L) · both Sorties ✅ fit       │
+├───────────────────────────────────────────────────────────┤
+│  [ START SORTIE 1 ]                                       │
+└───────────────────────────────────────────────────────────┘
 ```
 
-*Design references:* Directly implements the Thursday 13:30–15:30 operational state machine, black-marker bundle sorting, DuitNow/Cash collection, and uncollected buffer return.
+The load figures are computed, not typed, and the screen **refuses to start a Sortie that exceeds `max_cargo_liters`**. This is the visible face of `ADR-0015`.
 
-### 4.3 Founder / Admin Batch Aggregation Console
+Note the two Sorties are **not** equal: 22 cartons split 11/11 still differ in volume because the cartons are different sizes. The average is 824 L, but the real loads are 869 L and 778 L. A Myvi (800 L) cannot take the 869 L Sortie; an Avanza can take both.
+
+### 4.2 Pickup — count what arrived
 
 ```
-+-----------------------------------------------------------------------------------+
-| 📊 SARPPLY ADMIN — Premier 101 Pool (Delivery: Thu, Oct 29)  State: [POOL_LOCKED] |
-+-----------------------------------------------------------------------------------+
-| Active Stalls: 8 / 8 Target | Batch GMV: RM 2,000.00 | Est. Net Margin: RM 155.00 |
-+-----------------------------------------------------------------------------------+
-| SKU | Total Ordered | Boot Buffer | Cartons to Buy | New Buffer | Wholesale Cost  |
-|     |   (Q_b,i)     |  (S_prev)   |    (C_b,i)     |  (S_end)   |   (Pending PO)  |
-|-----+---------------+-------------+----------------+------------+-----------------|
-| A1  |  28 bundles   |  2 bundles  |   3 Cartons    | 4 bundles  |   RM 405.00     |
-| A2  |  19 bundles   |  1 bundle   |   2 Cartons    | 2 bundles  |   RM 296.00     |
-| B1  |  22 packs     |  0 packs    |   2 Cartons    | 2 packs    |   RM 204.00     |
-| C1  |  30 bundles   |  0 bundles  |   3 Cartons    | 0 bundles  |   RM 330.00     |
-| D1  |   6 half-ctns |  0 half-ctn |   3 Cartons    | 0 half-ctn |   RM 384.00     |
-| E1  |  14 bottles   |  0 bottles  |   4 Cartons    | 2 bottles  |   RM 184.00     |
-+-----------------------------------------------------------------------------------+
-| [ 📤 Send WhatsApp Receipts (Script C) ]   [ 📋 Copy Pending Wholesaler PO Text ] |
-+-----------------------------------------------------------------------------------+
+┌───────────────────────────────────────────────────────────┐
+│ 📦 PENDING PICKUP — verify before Founder pays            │
+├───────────────────────────────────────────────────────────┤
+│  [A1]  7 cartons  (14 boxes: 7 bodies + 7 lids)  [ − ][ + ]│
+│  [A2]  3 cartons  ( 6 boxes)                      [ − ][ + ]│
+│  [B1]  3 cartons                                  [ − ][ + ]│
+│  [C1]  3 cartons                                  [ − ][ + ]│
+│  [D1]  4 cartons                                  [ − ][ + ]│
+│  [E1]  4 cartons                                  [ − ][ + ]│
+├───────────────────────────────────────────────────────────┤
+│  Ordered: 22 cartons · Received: 21 ⚠️                     │
+│  [ CONFIRM COUNT & REQUEST PAYMENT ]                      │
+└───────────────────────────────────────────────────────────┘
 ```
 
-*Design references:* Implements the exact `Wholesaler_Aggregator` columns and unit economics metrics.
+A mismatch does not block the Runner; it records `cartons_received` and alerts the Founder, who then rations the shortfall by trust tier (`ADR-0011`).
+
+### 4.3 Sort manifest
+
+```
+┌───────────────────────────────────────────────────────────┐
+│ 🔪 SORTIE 1 — SORT LIST (write Stall # on each bundle)    │
+├───────────────────────────────────────────────────────────┤
+│ 📦 [A1] 7 cartons opened → 70 bundles                     │
+│    Stall #03  ×5   [ ✓ ]      Stall #07  ×5   [ ✓ ]       │
+│    Stall #11  ×6   [   ]      Stall #12  ×5   [   ]       │
+│    Stall #15  ×4   [   ]                                  │
+│    📥 12 surplus → Buffer Stock (do not deliver)          │
+├───────────────────────────────────────────────────────────┤
+│  [ DELIVER TO STALLS ]                                    │
+└───────────────────────────────────────────────────────────┘
+```
+
+### 4.4 Stall handover
+
+```
+┌───────────────────────────────────────────────────────────┐
+│ 📍 STALL #03 — Ah Seng Kolok Mee                          │
+├───────────────────────────────────────────────────────────┤
+│ Ordered  · [A1] ×5 = RM 75.00 · [C1] ×2 = RM 24.40        │
+│                                                           │
+│ Delivered:   A1 [ 5 ]   C1 [ 2 ]      (read-only orders,  │
+│                                        editable delivery) │
+├───────────────────────────────────────────────────────────┤
+│ TOTAL: RM 99.40                                           │
+│                                                           │
+│ ( ) 📲 DuitNow  → attach proof [ 📷 ]                     │
+│ ( ) 💵 Cash                                               │
+│ ( ) ⚠️ Uncollected → return to Buffer Stock               │
+├───────────────────────────────────────────────────────────┤
+│  [ CONFIRM — sends WhatsApp receipt ]                     │
+└───────────────────────────────────────────────────────────┘
+```
+
+`PAID_DUITNOW` cannot be selected without a proof upload. The old "Verified on Hawker Screen" option is gone: it claimed a verification that does not exist.
+
+---
+
+## 5. Founder Admin Console
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ 📊 SARPPLY ADMIN — Route: Premier 101 + Gala City                     │
+│ Batch: Thu 29 Oct · State: CLOSED_AT_CUTOFF                           │
+├───────────────────────────────────────────────────────────────────────┤
+│ Active Stalls: 14 / 14   Sorties: 2                                    │
+│ GMV RM 2,603.60 · Forecast GP RM 253.40 · Net cash RM 119.60 ⚠️        │
+│ Gate: ✅ GP ≥ RM 150 (headroom +4.16% on carton cost)                  │
+├───────────────────────────────────────────────────────────────────────┤
+│ SKU │ Ordered │ S_prev │ Cartons │ Boxes │ S_end │ Cash    │ GMV       │
+│ ────┼─────────┼────────┼─────────┼───────┼───────┼─────────┼────────── │
+│ A1  │   60    │   0    │    6    │  12   │   0   │ RM 810  │ RM 900.00 │
+│ A2  │   24    │   0    │    3    │   6   │   6   │ RM 444  │ RM 396.00 │
+│ B1  │   24    │   0    │    2    │   2   │   0   │ RM 204  │ RM 228.00 │
+│ C1  │   28    │   0    │    3    │   3   │   2   │ RM 330  │ RM 341.60 │
+│ D1  │    8    │   0    │    4    │   4   │   0   │ RM 512  │ RM 556.00 │
+│ E1  │   14    │   0    │    4    │   4   │   2   │ RM 184  │ RM 182.00 │
+│ ────┼─────────┼────────┼─────────┼───────┼───────┼─────────┼────────── │
+│ TOT │  158    │        │   22    │  31   │  10   │ RM2,484 │ RM2,603.60│
+│     │         │        │         │       │       │         │ Buffer RM 133.80 │
+├───────────────────────────────────────────────────────────────────────┤
+│ Sortie 1 (Premier 101): 869 L / 1,000 L ✅  (11 cartons)              │
+│ Sortie 2 (Gala City):   778 L / 1,000 L ✅  (11 cartons)              │
+├───────────────────────────────────────────────────────────────────────┤
+│ [ 📤 Send receipts ]  [ 📋 Copy Wholesaler PO ]  [ 🎧 Voice queue: 11 ]│
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+Three deliberate differences from v1.0: the header shows **Realized/forecast GP and the gate**, not a net-margin figure that hid the cash problem; **Net cash can be lower than GP** and is shown as such; and the **voice queue** is a first-class control, because 11 unreviewed drafts silently expiring is a real failure mode.
