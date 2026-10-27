@@ -598,7 +598,8 @@ Every SQL block in this document was executed against **PostgreSQL 16.2** in thi
 | Forecast GP | RM 253.40 | **RM 253.40** |
 | Realized GP after full delivery | RM 253.40 | **RM 253.40** |
 | Closing Buffer Stock at cost | RM 133.80 | **RM 133.80** |
-| Identity `Realized GP − Buffer = GMV − cash` | RM 119.60 | **RM 119.60** |
+| Net Batch Cash Flow, Week 1 | RM 34.60 | **RM 34.60** |
+| Identity `GP − (close − open Buffer) − runner = Net Cash` | 0.00 | **0.000000** |
 | Re-running `fn_receive_po` twice | 0 extra movements | **0 extra** |
 | Re-running `fn_record_delivery` twice | 0 extra movements | **0 extra** |
 | Re-running `fn_reconcile_batch` twice | buffer unchanged | **unchanged** |

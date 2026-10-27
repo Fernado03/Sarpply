@@ -157,7 +157,7 @@ Break cartons in the boot, mark Stall numbers, deliver, attest payment, send rec
 2. Confirm every handover produced a receipt echo.
 3. Record any uncollected Bundles as Buffer Stock (not as a loss).
 4. Pay the Runner RM 85 (2 × RM 42.50).
-5. Publish Forecast GP, Realized GP and Net Batch Cash Flow. **If the identity `Realized GP − Buffer at cost = Net Cash` fails, stop and fix the ledger before the next batch.**
+5. Publish Forecast GP, Realized GP and Net Batch Cash Flow. **If the identity `Realized GP − (closing − opening Buffer at cost) − Sortie cost = Net Cash` fails, stop and fix the ledger before the next batch.**
 
 ---
 

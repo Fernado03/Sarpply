@@ -123,7 +123,7 @@ Note **received**, not calculated: a Wholesaler shortfall must flow through, not
 | **Realized GP** | `Σ delivered × (locked_price − locked_cost)` **+ Spot Sales** | **The gate** |
 | **Net Batch Cash Flow** | `collected − cartons_received × carton_cost − sortie_count × runner_rate` | Float planning |
 
-Identity: `Realized GP − closing Buffer Stock at cost = Net Batch Cash Flow`. Any report violating it has a ledger bug (`ADR-0010`).
+Identity: `Realized GP − (closing Buffer at cost − opening Buffer at cost) − Sortie cost = Net Batch Cash Flow`. The Runner term is inside the identity because `Net Batch Cash Flow` already has it deducted. It reduces to `GP − closing Buffer − runner` only in the first batch, when opening stock is zero. Any report violating the general form has a ledger bug (`ADR-0010`).
 
 ### 3.4 Sortie capacity
 

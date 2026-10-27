@@ -203,7 +203,7 @@ A mismatch does not block the Runner; it records `cartons_received` and alerts t
 │ Batch: Thu 29 Oct · State: CLOSED_AT_CUTOFF                           │
 ├───────────────────────────────────────────────────────────────────────┤
 │ Active Stalls: 14 / 14   Sorties: 2                                    │
-│ GMV RM 2,603.60 · Forecast GP RM 253.40 · Net cash RM 119.60 ⚠️        │
+│ GMV RM 2,603.60 · Forecast GP RM 253.40 · Net cash RM 34.60 ⚠️         │
 │ Gate: ✅ GP ≥ RM 150 (headroom +4.16% on carton cost)                  │
 ├───────────────────────────────────────────────────────────────────────┤
 │ SKU │ Ordered │ S_prev │ Cartons │ Boxes │ S_end │ Cash    │ GMV       │

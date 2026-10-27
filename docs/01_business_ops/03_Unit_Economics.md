@@ -118,16 +118,31 @@ A hired van at ~RM 150/shift consumes **59%** of a Route's RM 253.40 gross profi
 | :--- | :--- | ---: | :--- |
 | **Forecast GP** | Ordered bundles, at Cutoff | RM 253.40 (if fully delivered) | The number you *expect*; already known Wednesday noon |
 | **Realized GP** | **Delivered** bundles only | RM 253.40 → lower if short | **The gate metric.** Accrual, not cash |
-| **Net Batch Cash Flow** | Cash in − cash out | RM 119.60 (week 1) | What actually hits the bank this week |
+| **Net Batch Cash Flow** | Cash in − cash out − Runner | RM 34.60 (week 1) | What actually hits the bank this week |
 
 The identity that ties them:
 
 ```
-Realized GP − Buffer Stock at cost = Net Batch Cash Flow
-RM 253.40  − RM 133.80             = RM 119.60
+Realized GP − (closing Buffer at cost − opening Buffer at cost) − Sortie cost = Net Batch Cash Flow
 ```
 
-This is not an error term. It is the price of rounding Master Cartons up. **A batch can show a healthy Realized GP and a negative cash week** — and the 12-Stall Route does exactly that in Week 1 (§5).
+**Week 1**, where the opening buffer is zero and the Runner is paid once, this simplifies to:
+
+```
+RM 253.40 − RM 133.80 − RM 85.00 = RM 34.60
+```
+
+The earlier draft of this section omitted the Runner term and printed RM 119.60, which is GP net of Buffer Stock but **before** the Runner was paid. The corrected Week-1 net cash is **RM 34.60**.
+
+**Week 2 onward it does not.** Starting with RM 133.80 of carried stock, a week that sells down the buffer shows a *higher* cash figure than its GP:
+
+```
+GP 210.70 − (close 144.80 − open 268.90) − 85.00 = 210.70 + 124.10 − 85.00 = RM 249.80
+```
+
+That is the 12-Stall Route selling down last week's surplus. It looks like a good week, and it is — but part of it is the previous week's cash arriving late, not new profit.
+
+This is not an error term. It is the price of rounding Master Cartons up, and the **change** in buffer is what separates accrual profit from cash. A batch can show a healthy Realized GP and a negative cash week — the 12-Stall Route does exactly that in Week 1 (§5) — and a week showing strong cash can be selling its own stock.
 
 ---
 
