@@ -1,0 +1,119 @@
+Description:
+Production-readiness audits and motion architecture for web apps: anti-slop UI review, animation stack choice and implementation (CSS, Motion, GSAP, Lenis, Three.js/R3F), Core Web Vitals, security, accessibility, SEO, and legal compliance. Use for pre-launch or production-readiness reviews, design reviews meant to remove generic AI-looking UI, and when choosing or building animation, scroll, or 3D effects. Not for routine bug fixes or isolated backend changes.
+
+Instructions:
+# Web Production & Motion Standards
+
+Opinionated defaults for web apps that look deliberate, move well, and hold up in production. They are defaults, not laws: the user's instructions and the repository's own conventions (AGENTS.md, design tokens, existing libraries) take precedence.
+
+## Workflow
+
+1. **Scope and triage.** Match the request: an animation task uses §2 plus the performance and accessibility rules it touches; a full audit covers every applicable section. Identify the product type (public marketing site, SaaS app, internal tool, local-first or desktop app, API) and skip sections that don't fit, saying which and why. A localhost-only tool needs no sitemap, cookie banner, or CDN strategy.
+2. **Gather evidence before judging.** Read the design tokens and global styles, the dependency list, and representative pages; take screenshots at mobile and desktop widths. Run the project's checks (lint, typecheck, tests, build) and whatever audit tooling is available: Lighthouse, axe, a bundle analyzer, query plans (`EXPLAIN`) for hot queries, `curl -sI` for headers, the package manager's audit. Run one-off tools with `npx` or `pnpm dlx` instead of adding them as dependencies.
+3. **Report by severity**, each finding with evidence (file:line, metric, or screenshot) and a concrete fix:
+   - Blocker: security holes, data loss, legal exposure, and accessibility failures that stop a task (keyboard traps, unlabeled controls, unreadable contrast).
+   - Major: other WCAG AA failures, Core Web Vitals misses, missing loading/empty/error states, jank.
+   - Minor: polish and taste.
+4. **Fix within scope.** If the user asked only for a review, report and stop. Otherwise fix blockers and clear bugs. In an existing product, treat taste changes (fonts, palette, icon set, radii) as proposals unless a redesign was requested. Don't add a dependency when the platform or an existing dependency covers the need.
+5. **Verify** with the tool that found the issue, plus a keyboard-only pass and a reduced-motion pass for UI changes.
+
+## 1. Visual anti-slop
+
+- **Color:** one intentional brand accent plus semantic status colors, all as tokens. Avoid default Tailwind indigo/violet as the brand, purple-to-blue gradients, gradient headline text, and low-contrast dark themes.
+- **Type:** don't default to Inter, Space Grotesk, or Instrument Serif; choose type for the brand. Use a consistent type scale, keep body text left-aligned and under ~70ch per line, and leave emoji out of headings.
+- **Shape and surfaces:** a small radius scale from tokens, with nested corners concentric (inner radius = outer radius − padding). Avoid floating glow blobs, blanket glassmorphism or backdrop blur, colored-border accent cards, and the repeated three-column icon grid.
+- **Components:** theme component libraries (e.g., shadcn/ui) instead of shipping their defaults. Keep headless primitives (Radix, React Aria, Base UI) for their accessibility behavior.
+- **Icons:** one set, consistent size and stroke. Stock Lucide reads as template-made in new designs, so consider a set that fits the brand (e.g., Phosphor), but don't migrate an existing project's set outside a redesign.
+- **Copy:** no fabricated testimonials, user counts, logos, ratings, or compliance badges; every claim must be true. Cut hype filler ("unlock", "seamless", "elevate") and em-dash-heavy AI voice.
+- **Marketing pages:** the primary call to action is visible in the first viewport.
+
+## 2. Motion
+
+### Choose the lightest tool that works
+
+Climb only as far as needed, one library per concern:
+
+1. **CSS and the platform:** transitions and keyframes for hover, focus, toggles, and simple entrances; `@starting-style` for enter animations; the View Transitions API for state and route changes; IntersectionObserver plus a class for reveal-on-scroll; scroll-driven animations (`animation-timeline: view()` / `scroll()`) as progressive enhancement inside `@supports`.
+2. **Motion (`motion/react`, formerly Framer Motion):** state-driven React UI such as enter/exit (`AnimatePresence`), layout and shared-element transitions, drag with momentum, and springs. `LazyMotion` with `m` components cuts the initial-render cost from ~34 kB to ~4.6 kB, with features loaded separately.
+3. **GSAP + ScrollTrigger:** choreographed timelines, pinning, scrubbed scroll scenes, SplitText, SVG morph/draw. Since 3.13 every plugin is free and ships in the public `gsap` npm package; no Club tokens or private registry.
+4. **Lenis:** only when the design explicitly calls for smoothed scrolling. Use one smoother; never combine Lenis with GSAP ScrollSmoother or `ScrollTrigger.normalizeScroll()`.
+5. **Three.js / React Three Fiber:** real 3D only, never for effects CSS or SVG can do.
+
+React Spring (with `@use-gesture/react`) and Anime.js are fine where a project already uses them; don't add them alongside Motion or GSAP for overlapping features.
+
+### Rules
+
+- **Composite-only for continuous motion:** loops, scroll-linked, and gesture-driven animation touch only `transform` and `opacity` (`filter` and `clip-path` sparingly). For one-off size changes such as accordions, prefer FLIP (Motion `layout`); a short `grid-template-rows: 0fr → 1fr` transition (or `interpolate-size` where supported) is acceptable on small subtrees. Use `will-change` only around active animations.
+- **Don't hide LCP content:** the hero headline and image render visible in the server HTML. Chromium doesn't count `opacity: 0` elements as LCP candidates, so a fade-in that waits for hydration delays LCP. Set below-the-fold hidden states before first paint (CSS or server-rendered styles), never in an effect, or content flashes.
+- **Reduced motion:** honor `prefers-reduced-motion` through the CSS media query, `<MotionConfig reducedMotion="user">` or `useReducedMotion`, and `gsap.matchMedia()`; don't start Lenis or autoplaying 3D. Swap movement for fades or instant changes rather than removing feedback. Autoplaying motion that lasts over 5 s needs a pause control (WCAG 2.2.2), and nothing flashes more than 3 times per second.
+- **Lifecycle:** in React use `useGSAP()` from `@gsap/react` (or `gsap.context()` with `revert()`). On unmount, kill ScrollTriggers, destroy Lenis, cancel rAF loops, and disconnect observers; StrictMode runs effects twice in development, so leaks show up there first. Remove ScrollTrigger `markers` before shipping.
+- **Lenis with GSAP:** drive Lenis from GSAP's ticker with its own loop off (`autoRaf: false`; `ReactLenis` defaults it to `true`): `lenis.on('scroll', ScrollTrigger.update)`, `gsap.ticker.add(tick)` with `tick = (t) => lenis.raf(t * 1000)`, and `gsap.ticker.lagSmoothing(0)`. On cleanup, call `gsap.ticker.remove(tick)` and `lenis.destroy()`.
+- **3D budget:** lazy-load the canvas on the client, cap DPR (`dpr={[1, 2]}`), use `frameloop="demand"` for mostly static scenes, pause rendering while the canvas is offscreen, compress assets (Draco or Meshopt geometry, KTX2 textures), dispose geometries, materials, and textures you create imperatively, and ship a static fallback for no-WebGL, low-power devices, and reduced motion.
+- **Server-rendered frameworks:** keep animation code in small client components (`'use client'`) so pages stay server-rendered.
+- **Where not to animate:** dense data grids, transactional flows, and repeated actions get brief feedback transitions (≤ 200 ms), not choreography.
+- **Verify:** DevTools Performance with 4–6× CPU throttling (no long tasks or dropped frames while animating), Rendering → Paint flashing and Layout Shift Regions, and a pass with reduced motion emulated (Playwright `reducedMotion: 'reduce'`).
+
+## 3. Frontend performance and UX states
+
+- **Targets (p75, mobile):** LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1. Prefer field data (CrUX or RUM); use lab runs to diagnose.
+- **Images:** AVIF/WebP, responsive `srcset`/`sizes`, explicit dimensions. Lazy-load below the fold but never the LCP image, which gets `fetchpriority="high"` or the framework equivalent.
+- **Fonts:** self-host and subset, preload only critical faces, `font-display: swap` or `optional`, and metric-matched fallbacks (e.g., `next/font`) to avoid layout shift.
+- **JavaScript:** split at route boundaries, lazy-load heavy widgets (editors, charts, 3D), defer third-party scripts, and check bundle impact before adding a dependency.
+- **Runtime:** debounce or throttle high-frequency handlers, paginate or virtualize long lists, break up long tasks or move them to a worker, and avoid needless re-renders.
+- **States:** every async surface has loading, empty, error, and success states. Forms show inline errors linked to their fields (`aria-describedby`) and keep the user's input on failure. Skeletons suit content-shaped layouts; don't flash a loader for waits under ~300 ms.
+
+## 4. Backend and data
+
+- Index foreign keys (Postgres and SQLite don't do it automatically) and the columns behind hot filters and sorts. Confirm with the query plan; every index slows writes.
+- Remove N+1 queries with joins or batching, select only needed columns, and use keyset pagination for large tables.
+- Cache expensive shared reads with explicit invalidation. Never cache per-user responses on shared CDN layers (`Cache-Control: private` or `no-store`, correct `Vary`).
+- Size connection pools for the deployment model; serverless usually needs an external pooler or an HTTP driver.
+- Compress once, at the edge or the server (many hosts and frameworks already do). APIs return only the fields clients use.
+
+## 5. Security
+
+- **Secrets:** server-only; never in client bundles or public env prefixes (`NEXT_PUBLIC_`, `VITE_`). In Next.js, mark server-only modules with `import 'server-only'`. A secret that was committed or exposed is compromised: rotate it first. Rewriting Git history is a destructive force-push that needs the owner's explicit approval and never replaces rotation.
+- **Authorization:** check on the server in every route handler, API endpoint, and server action (all are public HTTP endpoints). Middleware/proxy checks are an optimization, not the boundary. Deny by default and verify object ownership. Use RLS when clients query the database directly (Supabase, PostgREST).
+- **Input and output:** validate input at the boundary with a schema, parameterize queries, and encode output for its context. Sanitize user-supplied HTML before rendering it (e.g., DOMPurify). Audit `dangerouslySetInnerHTML`/`innerHTML`, `javascript:` URLs, and JSON inside `<script>` tags (escape `<` in JSON-LD).
+- **Transport and headers:** HTTPS with HSTS; a CSP (in Next.js, nonce-based CSP forces dynamic rendering, so choose deliberately); `frame-ancestors`; `X-Content-Type-Options: nosniff`; `Referrer-Policy`; CORS limited to known origins. Session cookies are `HttpOnly; Secure; SameSite=Lax` or stricter, with CSRF protection for cookie-authenticated mutations.
+- **Abuse:** rate-limit sign-in, sign-up, password reset, and expensive endpoints; block SSRF in server-side fetches of user-supplied URLs; validate uploads by type and size.
+- **Supply chain:** commit the lockfile, install from it in CI (`npm ci` or `--frozen-lockfile`), run the package manager's audit, prefer maintained packages, and avoid dependencies for trivial code.
+- Hiding production source maps isn't a security control, since client code is public anyway. If you don't want them served, upload them privately to your error monitor.
+
+## 6. SEO and metadata (public, indexable pages only)
+
+- Unique title and meta description per route, canonical URLs, and Open Graph/Twitter tags with an image.
+- `robots.txt` and `sitemap.xml` that match reality. Use `noindex` for pages that shouldn't rank, and don't also block them in `robots.txt`, or crawlers never see the tag. Keep staging behind auth.
+- Structured data only for content that is actually on the page.
+- Descriptive `alt` for informative images; `alt=""` for decorative ones.
+
+## 7. Accessibility (WCAG 2.2 AA)
+
+- Semantic HTML and landmarks, logical heading order, native elements before ARIA.
+- Visible `:focus-visible` styles, logical tab order, no keyboard traps. Dialogs move focus in, contain it, and restore it on close (native `<dialog>` or a headless library).
+- Every control labeled; errors announced and linked to their fields; `aria-live` for async status.
+- Contrast ≥ 4.5:1 for text and ≥ 3:1 for large text, UI components, and focus indicators. Targets ≥ 24×24 CSS px. Never convey meaning by color alone. Support 200% zoom and 320 px reflow; don't disable pinch-zoom.
+- Test with axe, a keyboard-only pass, and a screen-reader spot check (VoiceOver or NVDA).
+
+## 8. Legal and compliance (when the product collects data, sells, or sends email)
+
+- A privacy policy wherever personal data is processed, terms of service for accounts or paid products, and a refund policy when selling.
+- A cookie policy and consent banner only for non-essential cookies, storage, or trackers, which load only after consent. Without them, skip the banner.
+- Consent checkboxes are unticked by default and used only where consent is the legal basis (e.g., marketing email).
+- Marketing email needs a working unsubscribe link. Bulk senders to Gmail and Yahoo also need one-click `List-Unsubscribe` headers (RFC 8058) and SPF, DKIM, and DMARC. Transactional email (receipts, password resets) is exempt from the unsubscribe rules.
+- Accessibility is a legal requirement in many markets (ADA claims in the US; the European Accessibility Act in the EU since June 2025).
+- Confirm licenses for fonts, images, icons, and libraries before shipping.
+
+## 9. Operations
+
+- Error tracking and structured logs with no secrets or personal data; a health check and uptime alerting.
+- Environment variables validated at startup; separate staging and production credentials.
+- Backups with a tested restore, backward-compatible migrations, and a rollback path for deploys.
+
+## Gotchas
+
+- Motion renders `initial` values into the server HTML, so `initial={{ opacity: 0 }}` keeps above-the-fold content invisible until hydration. Use `initial={false}` or CSS there.
+- GSAP is free for commercial use, but its standard license bars use in no-code visual animation builders that compete with Webflow. Motion is MIT; Motion+ (premium examples and APIs) is paid.
+- ScrollTrigger measures positions on load and resize. Layout that changes later (lazy images, late fonts, fetched data) leaves start/end points stale until `ScrollTrigger.refresh()`.
+- Running Lenis's own loop (`autoRaf`) alongside the GSAP ticker drives scrolling twice and stutters.
+- Skip sections that don't apply rather than inventing work: legal pages, cookie banners, and SEO bolted onto an internal or local-only tool are noise.
