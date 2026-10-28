@@ -101,7 +101,7 @@ Consequences the operating plan must accept:
 | **7** | **`D1` brand substitution** | The only branded SKU; a drink Stall wants a specific tin. | `D1` basket is otherwise resilient — `D1 = 0` still passes the RM 150 GP gate (RM 209.40). Never promise a specific brand until locked. | **Low.** |
 | **8** | **Voice order misheard** | Hokkien ASR at 96.6% CER plus accents. | No ASR output commits an order. Read-back in the Stall's `written_language`; commit only on `OK` / `YA` / `YES` / `1` / `好` / `对`, or Founder verification. Drafts queue in the Admin Console. | **Low**, but ~10–14 clips/week (~90 s) of Founder time is the real cost (`ADR-0014`). |
 | **9** | **Wholesaler out of stock (structural)** | Single source in Pending. | Pre-verified quotes from 2 Wholesalers in Pending / Demak Laut. | **Medium.** Switching mid-week breaks the price lock; treat as batch-cancelling, not batch-saving. |
-| **10** | **Cash float insufficient** | Worst week needs RM 2,484; Founder holds RM 2,000. | `max_intraday_po_cash_myr = 2600`. Hold RM 2,600 before Week 1. | **High if unplanned**, trivial if planned. |
+| **10** | **Cash float insufficient** | Worst measured week needs RM 1,673; v1.0 plan held RM 2,000. | `max_intraday_po_cash_myr = 2600`. Hold RM 2,600 before Week 1. | **Low at 9 Stalls**, rises with carton volume. |
 
 ---
 

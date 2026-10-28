@@ -74,22 +74,22 @@ Consolidating fragmented Bundle orders into Master Carton quantities unlocks fac
 ## 4. Where the Money Actually Is
 Eight Stalls at realistic baskets do **not** pay for a shift. The Route that does:
 
-| Measure | 8-Stall Cluster (old v1.0) | **12-Stall Route** (2 × 6, Myvi) | **14-Stall Route** (2 × 7, Avanza-class) |
+| Measure | 8-Stall Cluster (old v1.0) | **9-Stall Route** (measured) | 12-Stall Route `[EST]` |
 | :--- | ---: | ---: | ---: |
-| GMV per shift | RM 1,466.20 | RM 2,123.80 | **RM 2,603.60** |
-| Realized GP (accrual) | RM 143.50 | RM 210.70 | **RM 253.40** |
-| Runner payout | RM 45.00 (1 trip) | RM 85.00 (2 Sorties) | **RM 85.00** (2 Sorties) |
-| **Net Contribution Margin** | **RM 98.50** ✗ | RM 125.70 | **RM 168.40** ✓ |
-| Master Cartons / physical boxes | 14 | 19 / 28 | **22 / 31** |
-| Packed volume per sortie | — | 770 L peak | 869 L / 778 L |
+| GMV per shift | RM 1,466.20 | **RM 1,776.50** | RM 2,369.00 |
+| Realized GP (accrual) | RM 143.50 | **RM 177.25** | RM 236.00 |
+| Runner payout | RM 45.00 (1 trip) | **RM 42.50** (1 Sortie) | RM 85.00 (2 Sorties) |
+| **Net Contribution Margin** | **RM 98.50** ✗ | **RM 134.75** ✓ | RM 151.00 ✓ |
+| Master Cartons / physical boxes | 14 | 12–13 / 17–18 | 19 / 28 |
+| Packed volume per sortie | — | 980 L measured | ~1,440 L |
 | Gate (≥ RM 1,500 GMV, ≥ RM 150 GP) | ✗ fails by RM 6.50 | ✓ | ✓ |
 
 Four structural consequences, all verified in `03_Unit_Economics.md`:
 
-1. **A Cluster is not a viable unit.** The 8-Stall Cluster fails the RM 1,500 GMV / RM 150 GP gate before the Runner is paid. A Route of 12–14 Stalls clears it.
-2. **The vehicle is a hard constraint, and volume — not weight — binds.** 22 Master Cartons weigh only ~365 kg but pack to **1,318 L**, split into Sorties of **869 L and 778 L** — the heavier one exceeds an 800 L Myvi (`ADR-0015`). The 14-Stall Route therefore needs an Avanza-class vehicle; the 12-Stall Route fits a Myvi at ~770 L per Sortie, with 30 L to spare.
-3. **Procurement pools at Route level, fulfilment splits at Cluster level.** One PO, two sorties. Pooling the two Clusters saved 2 Master Cartons / RM 258 per week versus buying per Cluster, and cut steady Buffer Stock from 30 bundles to 10.
-4. **Rounding is a working-capital sawtooth.** Week 1 buys RM 2,484 of cartons for RM 2,603.60 of GMV; the RM 133.80 difference sits in the boot as Buffer Stock. Budget for the **worst** week (RM 2,484), not the average. At 12 Stalls it is worse still: cash out RM 2,182 against RM 2,123.80 of GMV — a **negative** first-week spread.
+1. **A Cluster is not a viable unit.** The 8-Stall Cluster fails the RM 1,500 GMV / RM 150 GP gate before the Runner is paid. A Route of **9 Stalls** clears it, measured on two live shifts.
+2. **The vehicle is a hard constraint, and it binds at 9 Stalls, not 14.** 12–13 Master Cartons pack to **826–902 L**, which fills a Myvi with the rear seats flat *and the front passenger seat occupied*. The modelled 0.80 packing divisor overestimated this at 1,127 L and would have rejected a load that actually fit — the measured efficiency is **92%** (`ADR-0015`). A tenth Stall needs a second Sortie or an Avanza-class vehicle.
+3. **Procurement pools at Route level.** One PO across both Clusters, because `A2` and `C1` round up once per Route instead of once per Cluster.
+4. **Rounding is a working-capital sawtooth.** B01 bought RM 1,673.00 of cartons against RM 1,657.00 of GMV and paid the Runner — **net cash −RM 58.50**. The RM 183.00 difference sits in the boot as Buffer Stock. Budget for the worst week, not the average.
 
 ---
 
@@ -183,15 +183,15 @@ The MVP restricts inventory strictly to **non-perishable, fully fungible back-of
     "name_bm": "Susu Krimer Manis 500g",
     "name_zh": "500g 炼奶 (茶水档专用)",
     "bundle_unit_name": "Half-Carton (24 tins)",
-    "bundles_per_master_carton": 2,
+    "bundles_per_master_carton": 8,
     "physical_boxes_per_carton": 1,
-    "carton_geometric_liters": 28.60,
+    "carton_geometric_liters": 28.00,
     "brand": "TBC at supplier lock-in",
     "is_brand_fungible": false,
-    "est_wholesaler_carton_cost_myr": 128.00,
-    "est_wholesaler_bundle_cost_myr": 64.00,
-    "seed_pool_bundle_price_myr": 69.50,
-    "street_retail_bundle_price_myr": 73.00,
+    "measured_wholesaler_carton_cost_myr": 160.00,
+    "measured_wholesaler_bundle_cost_myr": 20.00,
+    "measured_pool_bundle_price_myr": 21.00,
+    "street_retail_bundle_price_myr": null,
     "fungibility_score": "MEDIUM_HIGH",
     "payload_note": "The only branded line: a drink Stall that insists on a specific tin brand is not served by a substitute. Thinnest margin (7.9%) and smallest saving (4.8%) in the catalogue."
   },

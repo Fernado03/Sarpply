@@ -56,7 +56,11 @@ CREATE TABLE vehicles (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   label             VARCHAR(60) NOT NULL UNIQUE,   -- 'Myvi', 'Avanza'
   max_cargo_liters  INT  NOT NULL CHECK (max_cargo_liters > 0),
-  max_payload_kg    INT  CHECK (max_payload_kg > 0)
+  max_payload_kg    INT  CHECK (max_payload_kg > 0),
+  -- Measured packing efficiency, not a constant in app code. 0.92 was measured in
+  -- Phase 1; v1.1 hard-coded 0.80 and overstated packed volume by 15% (ADR-0015).
+  packing_efficiency NUMERIC(4,3) NOT NULL DEFAULT 0.92
+       CHECK (packing_efficiency > 0 AND packing_efficiency <= 1)
 );
 
 -- ─── Routes: the operating unit ────────────────────────────────────────────
@@ -73,16 +77,18 @@ CREATE TABLE routes (
   created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
--- ─── Clusters: geography, one Sortie each ──────────────────────────────────
+-- ─── Clusters: geography, assigned to a Sortie ────────────────────────────
 CREATE TABLE clusters (
   id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   route_id                  UUID NOT NULL REFERENCES routes(id) ON DELETE RESTRICT,
   name                      VARCHAR(100) NOT NULL,
+  -- Which Sortie serves this Cluster. Several Clusters MAY share a Sortie:
+  -- at 9 Stalls both Clusters ride Sortie 1, and that is normal, not an error
+  -- (ADR-0016). Do not add a UNIQUE (route_id, trip_number) constraint.
   trip_number               SMALLINT NOT NULL DEFAULT 1 CHECK (trip_number BETWEEN 1 AND 4),
   total_addressable_stalls  INT CHECK (total_addressable_stalls >= 0),
   created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (route_id, name),
-  UNIQUE (route_id, trip_number)
+  UNIQUE (route_id, name)
 );
 
 -- ─── Stalls: the buyer ─────────────────────────────────────────────────────
@@ -360,16 +366,16 @@ WITH cluster_demand AS (
 )
 SELECT pc.route_batch_id,
        pc.trip_number,
-       ROUND(SUM(pc.c_cartons  * pc.carton_geometric_liters) / 0.80, 1) AS packed_liters,
+       ROUND(SUM(pc.c_cartons  * pc.carton_geometric_liters) / v.packing_efficiency, 1) AS packed_liters,
        ROUND(SUM(pc.q_bundles::NUMERIC / pc.bundles_per_master_carton
-                 * pc.carton_geometric_liters) / 0.80, 1)               AS packed_liters_shared,
+                 * pc.carton_geometric_liters) / v.packing_efficiency, 1)               AS packed_liters_shared,
        v.max_cargo_liters,
-       (SUM(pc.c_cartons * pc.carton_geometric_liters) / 0.80) <= v.max_cargo_liters AS fits
+       (SUM(pc.c_cartons * pc.carton_geometric_liters) / v.packing_efficiency) <= v.max_cargo_liters AS fits
 FROM per_cluster pc
 JOIN route_batches b ON b.id = pc.route_batch_id
 JOIN routes r        ON r.id = b.route_id
 JOIN vehicles v      ON v.id = r.vehicle_id
-GROUP BY pc.route_batch_id, pc.trip_number, v.max_cargo_liters;
+GROUP BY pc.route_batch_id, pc.trip_number, v.max_cargo_liters, v.packing_efficiency;
 
 -- ─── Three margin figures ──────────────────────────────────────────────────
 CREATE OR REPLACE VIEW v_route_batch_pnl AS
@@ -530,46 +536,48 @@ CREATE POLICY runner_update_orders ON stall_orders FOR UPDATE TO authenticated
 ## 7. Seed data
 
 ```sql
-INSERT INTO vehicles (label, max_cargo_liters, max_payload_kg) VALUES
-  ('Myvi',   800,  500),
-  ('Alza',   498,  500),
-  ('Avanza', 1000, 550);
+INSERT INTO vehicles (label, max_cargo_liters, max_payload_kg, packing_efficiency) VALUES
+  ('Myvi',   980,  500, 0.92),   -- rear bench folded AND front passenger seat occupied
+  ('Alza',   498,  500, 0.92),   -- third row folded only
+  ('Avanza', 1000, 550, 0.92);   -- both rear rows folded
 
 INSERT INTO routes (name, cutoff_day, cutoff_time, delivery_day, sortie_count, vehicle_id)
-SELECT 'Premier 101 + Gala City', 'WEDNESDAY', '12:00:00', 'THURSDAY', 2, id
-FROM vehicles WHERE label = 'Avanza';
+SELECT 'Premier 101 + Gala City', 'WEDNESDAY', '12:00:00', 'THURSDAY', 1, id
+FROM vehicles WHERE label = 'Myvi';
 
+-- Both Clusters share Sortie 1: at 9 Stalls the whole Route fits one vehicle.
+-- trip_number is which Sortie serves the Cluster, not a Cluster ordinal (ADR-0016).
 INSERT INTO clusters (route_id, name, trip_number, total_addressable_stalls)
-SELECT r.id, 'Premier 101', 1, 40 FROM routes r WHERE r.name = 'Premier 101 + Gala City'
+SELECT r.id, 'Premier 101', 1, 26 FROM routes r WHERE r.name = 'Premier 101 + Gala City'
 UNION ALL
-SELECT r.id, 'Gala City',   2, 40 FROM routes r WHERE r.name = 'Premier 101 + Gala City';
+SELECT r.id, 'Gala City',   1, 26 FROM routes r WHERE r.name = 'Premier 101 + Gala City';
 
 INSERT INTO skus (sku_code, name_en, name_bm, name_zh, bundle_unit_name,
                   bundles_per_master_carton, physical_boxes_per_carton,
                   carton_geometric_liters, carton_gross_kg, is_brand_fungible) VALUES
-  ('A1','PP Microwave Box 650ml + Lid','Bekas Tapau PP 650ml','650ml 打包盒','Bundle (50 sets)',10,2,105.80,15.0,TRUE),
-  ('A2','PP Microwave Box 750ml + Lid','Bekas Tapau PP 750ml','750ml 打包盒','Bundle (50 sets)',10,2,105.80,15.0,TRUE),
-  ('B1','Brown Waxed Paper Large','Kertas Bungkus Besar','大号打包油纸','Pack (250 sheets)',12,1,14.00,8.0,TRUE),
-  ('C1','HM Singlet Bag 9x11','Plastik Tapau 9x11','9x11 手提袋','Bundle (5 packs)',10,1,33.70,7.5,TRUE),
-  ('D1','Sweetened Condensed Creamer 500g','Susu Krimer Manis 500g','500g 炼奶','Half-Carton (24 tins)',2,1,28.60,26.5,FALSE),
-  ('E1','Dishwashing Liquid 5L','Sabun Cuci Pinggan 5L','5L 洗碗精','Bottle (5L)',4,1,30.50,21.4,TRUE);
+  ('A1','PP Cup 22oz + Flat Lid','Bekas Tapau 22oz + Penutup Rata','22oz 打包杯','Bundle (100 pcs)',10,2,92.50,15.0,TRUE),
+  ('A2','PP Cup 16oz + Dome Lid','Bekas Tapau 16oz + Penutup Dome','16oz 打包杯','Bundle (100 pcs)',10,2,84.00,13.0,TRUE),
+  ('B1','750ml Rectangular Food Container + Lid','Bekas Makanan 750ml','750ml 打包盒','Bundle (50 pcs)',10,1,76.00,9.0,TRUE),
+  ('C1','Kraft Brown Lunch Box','Kotak Makanan Kertas','牛皮午餐盒','Bundle (50 pcs)',12,1,68.50,8.0,TRUE),
+  ('D1','Evaporated / Condensed Milk','Susu Sejat / Pekat','炼奶','Bundle (6 tins)',8,1,28.00,18.0,FALSE),
+  ('E1','Singlet Oxo-Bag + Straw','Beg Plastik Tapau + Straw','打包袋 + 吸管','Bundle (10 pk)',10,1,35.00,12.0,TRUE);
 
 INSERT INTO wholesalers (name, area) VALUES ('Pending Packaging Supplies','Pending Industrial Estate');
 
 INSERT INTO wholesaler_prices (wholesaler_id, sku_code, carton_cost, valid_from, is_primary)
 SELECT w.id, v.sku, v.cost, DATE '2026-10-01', TRUE
 FROM wholesalers w,
- (VALUES ('A1',135.00),('A2',148.00),('B1',102.00),
-         ('C1',110.00),('D1',128.00),('E1',46.00)) AS v(sku, cost)
+ (VALUES ('A1',135.00),('A2',120.00),('B1',110.00),
+         ('C1',144.00),('D1',160.00),('E1',90.00)) AS v(sku, cost)
 WHERE w.name = 'Pending Packaging Supplies';
 
 INSERT INTO pool_prices (sku_code, wholesaler_price_id, pool_bundle_price,
                          observed_retail_bundle_price, valid_from)
-SELECT wp.sku_code, wp.id, v.pool, v.retail, DATE '2026-10-01'
+SELECT wp.sku_code, wp.id, v.pool, NULL, DATE '2026-10-01'
 FROM wholesaler_prices wp
-JOIN (VALUES ('A1',15.00,16.50),('A2',16.50,18.00),('B1',9.50,10.80),
-             ('C1',12.20,13.50),('D1',69.50,73.00),('E1',13.00,15.00))
-     AS v(sku,pool,retail) ON v.sku = wp.sku_code
+JOIN (VALUES ('A1',15.00),( 'A2',13.50),('B1',12.50),
+             ('C1',13.50),('D1',21.00),('E1',10.50))
+     AS v(sku,pool) ON v.sku = wp.sku_code
 WHERE wp.is_primary;
 ```
 
@@ -579,30 +587,40 @@ WHERE wp.is_primary;
 
 | Column | Value | Status |
 | :--- | :--- | :--- |
-| `skus.physical_boxes_per_carton` for `A1`/`A2` | `2` | **Unverified.** One phone call (Script A Q1). If nested, set to 1 and halve `carton_geometric_liters` to 64.80. |
-| `skus.carton_geometric_liters` for `B1`, `C1`, `D1` | 14.00 / 33.70 / 28.60 | Estimated from pack format, not publisher data (`carton-payload-estimates.md`). |
-| `routes.runner_rate_per_sortie` | 42.50 | Confirm whether petrol is included. |
+| `skus.physical_boxes_per_carton` for `A1`/`A2` | `2` | ✅ **Resolved by measurement.** Lids ship as a separate box; they do not nest. |
+| `skus.carton_geometric_liters` | 92.50 / 84.00 / 76.00 / 68.50 / 28.00 / 35.00 | ✅ **Measured** in the field. The v1.1 estimates (105.80 / 105.80 / 14.00 / 33.70 / 28.60 / 30.50) are deleted. |
+| `skus.carton_gross_kg` | 15.0 / 13.0 / 9.0 / 8.0 / 18.0 / 12.0 | `[EST]` — not weighed. Payload is volume-bound, so this does not gate vehicle choice. |
+| `routes.runner_rate_per_sortie` | 42.50 | **Still open.** Confirm on the next call whether petrol is included. |
+| `vehicles.max_cargo_liters` for Myvi | **980** | Measured, not nominal. 13 cartons of 901.5 L geometric packed to ~980 L and fit **only** with the front passenger seat occupied; the manufacturer's 800 L is the rear-bench-folded figure and is too low for the Founder's actual loading. |
+| `vehicles.packing_efficiency` | **0.92** | Measured from 901.5 L geometric packing to ~980 L. v1.1's hard-coded 0.80 overstated packed volume by 15% and would have demanded a second Sortie that was not needed. Two observations is thin evidence — keep it a column, not a constant. |
 | `stalls.written_language` | `ms-MY` default | No ASR locale is stored; Hokkien is handled by read-back only (`ADR-0014`). |
 
 ---
 
 ## 9. Validation record
 
-Every SQL block in this document was executed against **PostgreSQL 16.2** in this order — DDL → views → functions → RLS → seed — with the Golden-6 catalogue and a 14-Stall, 2-Cluster Route batch. Results:
+Every SQL block in this document was executed against **PostgreSQL 16.2** in this order — DDL → views → functions → RLS → seed — with the measured catalogue and a **replay of Batch 1**: 9 Stalls across 2 Clusters, 13 Master Cartons, 1 Sortie, including the one real short delivery (S05 ordered 8 `B1`, received 4).
 
-| Check | Expected | Actual |
-| :--- | :--- | :--- |
-| Master cartons for the reference Route | 22 | **22** |
-| Physical boxes | 31 | **31** |
-| Geometric litres | 1,317.7 | **1,317.7** |
-| Forecast GP | RM 253.40 | **RM 253.40** |
-| Realized GP after full delivery | RM 253.40 | **RM 253.40** |
-| Closing Buffer Stock at cost | RM 133.80 | **RM 133.80** |
-| Net Batch Cash Flow, Week 1 | RM 34.60 | **RM 34.60** |
+The replay must reproduce the Phase 1 workbook exactly, or the schema is not modelling the business:
+
+| Check | Workbook | Schema |
+| :--- | ---: | ---: |
+| Master cartons | 13 | **13** |
+| Physical boxes | 18 | **18** |
+| Geometric litres | 901.5 | **901.5** |
+| Forecast GP (ordered) | RM 173.00 | **RM 173.00** |
+| Realized GP (delivered) | RM 167.00 | **RM 167.00** |
+| Closing Buffer Stock at cost | RM 183.00 | **RM 183.00** |
+| Net Batch Cash Flow | −RM 58.50 | **−RM 58.50** |
 | Identity `GP − (close − open Buffer) − runner = Net Cash` | 0.00 | **0.000000** |
+| Gate headroom at which the batch fails | +1.14% | **+1.14%** |
+| `v_sortie_load.packed_liters` (1 Sortie, 13 cartons) | ~980 L | **979.9 L** |
+| `v_sortie_load.fits` against Myvi (980 L @ 0.92) | TRUE | **TRUE** |
 | Re-running `fn_receive_po` twice | 0 extra movements | **0 extra** |
 | Re-running `fn_record_delivery` twice | 0 extra movements | **0 extra** |
 | Re-running `fn_reconcile_batch` twice | buffer unchanged | **unchanged** |
+
+Forecast GP (RM 173.00) exceeds Realized GP (RM 167.00) by exactly RM 6.00 — 4 Bundles of `B1` at RM 1.50. That single difference is the whole point of `ADR-0010`: the number known at Cutoff and the number the gate is judged on are not the same number.
 
 Rejected as intended: DuitNow without `payment_proof_url`; `delivered_bundles > ordered_bundles`; a Stall with `onboarding_status = 'ACTIVE'` and no phone; `trust_tier = 'PREPAY_REQUIRED'`; `fulfilment_status` inconsistent with the bundle counts; any `written_language` outside the three supported codes.
 

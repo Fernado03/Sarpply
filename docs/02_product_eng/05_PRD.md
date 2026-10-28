@@ -85,14 +85,18 @@ Non-perishable, fungible, high-overlap across noodle, rice, burger and drink Sta
 
 | SKU | Product | Bundle | Bundles/MC | Boxes/MC | Litres/MC | Carton cost | Pool price | Street | Saving | Margin |
 | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| **A1** | PP Box 650 ml + lid | 50 sets | 10 | **2** | **105.80** | RM 135.00 | **RM 15.00** | RM 16.50 | 9.1% | 10.0% |
-| **A2** | PP Box 750 ml + lid | 50 sets | 10 | **2** | **105.80** | RM 148.00 | **RM 16.50** | RM 18.00 | 8.3% | 10.3% |
-| **B1** | Brown waxed paper, large | 250 sheets | 12 | 1 | 14.00 | RM 102.00 | **RM 9.50** | RM 10.80 | 12.0% | 10.5% |
-| **C1** | HM singlet bag 9×11 | 5 packs | 10 | 1 | 33.70 | RM 110.00 | **RM 12.20** | RM 13.50 | 9.6% | 9.8% |
-| **D1** | Condensed creamer 500 g | 24 tins | 2 | 1 | 28.60 | RM 128.00 | **RM 69.50** | RM 73.00 | 4.8% | 7.9% |
-| **E1** | Dishwashing liquid 5 L | 1 bottle | 4 | 1 | 30.50 | RM 46.00 | **RM 13.00** | RM 15.00 | 13.3% | 11.5% |
+| SKU | Item | Pack | Bundles/MC | Boxes/MC | Litres/MC | Carton Cost | Pool Price | Margin |
+| :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| **A1** | PP cup 22 oz + flat lid | 10 bundles × 100 pcs | 10 | **2** | **92.50** | RM 135.00 | **RM 15.00** | 10.0% |
+| **A2** | PP cup 16 oz + dome lid | 10 bundles × 100 pcs | 10 | **2** | **84.00** | RM 120.00 | **RM 13.50** | 11.1% |
+| **B1** | 750 ml rectangular food container + lid | 10 bundles × 50 pcs | 10 | 1 | 76.00 | RM 110.00 | **RM 12.50** | 12.0% |
+| **C1** | Kraft brown lunch box | 12 bundles × 50 pcs | 12 | 1 | 68.50 | RM 144.00 | **RM 13.50** | 11.1% |
+| **D1** | Evaporated / condensed milk | 8 bundles × 6 tins | 8 | 1 | 28.00 | RM 160.00 | **RM 21.00** | 4.8% |
+| **E1** | Singlet oxo-bag + straw | 10 bundles | 10 | 1 | 35.00 | RM 90.00 | **RM 10.50** | 14.3% |
 
-**Boxes/MC for `A1`/`A2` is unverified.** It assumes lids ship as a separate carton. If the Kuching Wholesaler nests them, `A1`/`A2` become 1 box at 64.8 L and every Route gains a trip's worth of headroom. This is Question 1 on Script A and must be answered before a vehicle is chosen.
+**Every figure above is measured** from Batch 1 and Batch 2 supplier invoices and field measurement, replacing the v1.1 seed table. Street-retail and stall-saving columns are dropped: only one saving has been measured (`C1` at RM 0.50, 3.7%) and quoting unmeasured savings to Stalls is a credibility risk.
+
+**`A1`/`A2` ship as two physical boxes per price unit** — bodies and lids are not nested. Confirmed in the field, and it is why they carry the largest volume per Master Carton.
 
 **Out of scope (MVP):** perishables and recipe-specific ingredients; subsidised cooking oil and flour (2%–4% margin, heavy); any warehouse lease.
 
@@ -102,12 +106,13 @@ Non-perishable, fungible, high-overlap across noodle, rice, burger and drink Sta
 
 | Metric | Target | Why this number |
 | :--- | :--- | :--- |
-| **Realized GP per Route shift** | **≥ RM 150** | The commercial gate. 14-Stall Route delivers RM 253.40; 12-Stall RM 210.70. |
-| **GMV per Route shift** | **≥ RM 1,500** | Same gate. 14-Stall delivers RM 2,603.60. |
-| **Stalls per Route** | 12–14 | Below 12 the Route fails the gate before the Runner is paid. |
-| **Stalls per Cluster** | 6–7 | 7 requires Avanza-class; 6 fits a Myvi-class. |
+| **Realized GP per Route shift** | **≥ RM 150** | The commercial gate. Measured: RM 167.00 (B01), RM 187.50 (B02). |
+| **GMV per Route shift** | **≥ RM 1,500** | Same gate. Measured: RM 1,657.00 (B01), RM 1,896.00 (B02). |
+| **Gate headroom** | **≥ RM 25 of GP** | Measured headroom is RM 17.00 and RM 37.50 — a 1.1% Wholesaler rise erases the first. |
+| **Stalls per Route** | **9 (measured floor) – 10 (vehicle ceiling)** | Below 9 the gate fails; above 10 needs a second Sortie. |
+| **Stalls per Cluster** | 5 (Myvi) | Measured: 9 Stalls across two Clusters, one Sortie. |
 | **Penetration** | 20% of a ~65-Stall catchment, or 30–35% of one 40-Stall zone | See Pillar 2 §1.1. The v1.0 "20% of 40" was arithmetically impossible. |
-| **Net Contribution Margin** | RM 125.70 (12-Stall) – RM 168.40 (14-Stall) | After 2 × RM 42.50 Runner. |
+| **Net Contribution Margin** | **RM 134.75 – RM 145.00** | Measured, after one RM 42.50 Runner. |
 | **`D1` resilience** | Route still clears RM 150 GP with `D1 = 0` | RM 209.40. The least reliable SKU cannot sink a shift. |
 | **Voice drafts** | ~10–14 clips/week, < 90 s Founder review | The real cost of the read-back policy. |
 

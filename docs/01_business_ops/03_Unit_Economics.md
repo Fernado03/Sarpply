@@ -1,124 +1,153 @@
 ---
 project: Sarpply
 pillar: 03_Unit_Economics
-version: 1.1-MVP
+version: 2.0-MEASURED
 currency: MYR
-operating_unit: Route (2 Clusters, 12-14 Stalls, 2 sorties per shift)
-target_route_gmv_myr: 2603.60
-target_route_realized_gp_myr: 253.40
+operating_unit: Route (9 Stalls measured, 1 sortie per shift)
+measured_batches: B01 2026-10-15, B02 2026-10-22
+target_route_gmv_myr: 1776.50
+target_route_realized_gp_myr: 177.25
 runner_cost_per_sortie_myr: 42.50
-supersedes: v1.0 (8-stall cluster, RM 250 AOV, RM 2,000 batch, 15-20% spread, RM 45/trip, RM 6,200/mo)
+supersedes: v1.1-MVP (12-14 Stalls, 2 sorties, modelled baskets, seed prices)
 ---
 
 # Sarpply — Pillar 3: Unit Economics & Pricing Engine
 
-> **Terminology.** `GLOSSARY.md` is canonical: **Stall** (buyer), **Wholesaler** (supplier), **Bundle** (sell unit), **Master Carton** (buy unit), **Cluster** (~6–7 Stalls), **Route** (2 Clusters, the paid operating unit), **Buffer Stock** (leftover bundles carried at cost), **Realized GP** (margin on Delivered Bundles).
+> **Terminology.** `GLOSSARY.md` is canonical: **Stall** (buyer), **Wholesaler** (supplier), **Bundle** (sell unit), **Master Carton** (buy unit), **Cluster** (~6–7 Stalls), **Route** (the paid operating unit), **Buffer Stock** (leftover bundles carried at cost), **Realized GP** (margin on Delivered Bundles).
+
+> **Status.** Every figure in §2–§6 is now **measured** from two live Route shifts, not modelled. Where a number is still an estimate it is labelled `[EST]`. The v1.1 figures are kept only where they are still the best available, and each survivor is marked.
 
 ## 1. Thesis
 
-Traditional B2B grocery distribution fails at the micro-Stall level because delivering heavy, price-controlled staples (subsidised cooking oil, flour — 2%–4% margins) across scattered streets costs RM 80–110 in multi-drop transport, wiping out a 6% spread.
+Traditional B2B grocery distribution fails at the micro-Stall level because delivering heavy, price-controlled staples across scattered streets costs RM 80–110 in multi-drop transport, wiping out a 6% spread.
 
 **Sarpply survives on two multipliers, and only two:**
 
-1. **Density.** 12–14 Stalls in two Clusters 6–8 minutes apart, cleared in a single 3-hour shift.
-2. **Spread on light, high-value consumables.** Packaging and back-of-house consumables carry a **7.9%–11.5%** margin (blended **9.73%**), at only **291–365 kg per Route**.
+1. **Density.** 9 Stalls in two Clusters 6–8 minutes apart, cleared in a single 2.5–3.2 hour shift, **one Sortie**.
+2. **Spread on light, high-value consumables.** Packaging and back-of-house consumables carry a **4.8%–14.3%** margin per SKU, blended **9.9%** measured, at only **825–902 L** per Route.
 
-**What v1.0 got wrong, corrected here.** v1.0 claimed a "15%–20% wholesale spread", "RM 35–45" logistics, "120–180 kg per RM 2,000 batch", a 6-month path to "RM 6,200/month" on 40 batches, and an 8-Stall "single drop-off" cluster. Every one of those numbers was wrong:
+**What two weeks of trading changed:**
 
-| v1.0 claim | Verified figure | Where it breaks |
+| Modelled (v1.1) | Measured | Consequence |
 | :--- | :--- | :--- |
-| 15%–20% gross spread | **9.73% blended** (range 7.9%–11.5%) | Gate needs 5.76% of GMV; the cushion is thinner than stated |
-| 6%–8% hawker savings | **4.8%–13.3%**, 8.75% blended | `D1` at 4.8% is barely a reason to switch |
-| RM 35–45 logistics per batch | **RM 85.00** (2 sorties × RM 42.50) | 2× the assumed cost |
-| 120–180 kg per batch | **291 kg** (12-Stall) / **365 kg** (14-Stall) | Payload is volume-bound, not weight-bound |
-| RM 6,200/month | **RM 3,648/month** | RM 6,200 needs ~37 shifts ≈ 8.5 Routes, not 5 |
-| 8 Stalls = viable batch | **Fails the gate** (GP RM 143.50) | Cluster is not the operating unit; Route is |
+| 12–14 Stalls | **9 Stalls** | Smaller Route than designed |
+| 2 sorties, RM 85.00 Runner | **1 sortie, RM 42.50** | Logistics halved |
+| GMV RM 2,603.60 | **RM 1,657 → RM 1,896** | 73% of modelled volume |
+| Realized GP RM 253.40 | **RM 167.00 → RM 187.50** | 74% of modelled profit |
+| Gate headroom +4.16% | **+1.14% → +2.19%** | **The margin is far thinner than designed** |
+| Packing factor 80% | **92%** | Vehicle model overestimated volume 15% |
+| 22 cartons / 1,318 L | **13 → 12 cartons / 902 → 826 L** | Fits one Myvi |
+| Tier baskets T1/T2/T3 | **RM 50 – RM 348 per Stall** | Basket spread is far wider than three tiers |
+
+The last row of that table is the finding that governs Phase 2. The Route clears `ADR-0009`, but on a **1.1% cushion**.
 
 ---
 
-## 2. SKU Margin Table (Golden 6)
+## 2. SKU Margin Table — Measured (Batch 1 and Batch 2)
 
-| SKU | Item | Carton Cost | Cost/Bundle | **Pool Price** | Street Retail | **Stall Saving** | **Margin** |
+| SKU | Item | Bundles / Carton | **Carton Cost** | **Cost/Bundle** | **Pool Price** | **GP/Bundle** | **Margin** |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
-| **A1** | PP Box 650 ml (50 sets) | RM 135.00 / 10 | RM 13.50 | **RM 15.00** | RM 16.50 | 9.1% | 10.0% (RM 1.50) |
-| **A2** | PP Box 750 ml (50 sets) | RM 148.00 / 10 | RM 14.80 | **RM 16.50** | RM 18.00 | 8.3% | 10.3% (RM 1.70) |
-| **B1** | Brown Paper Large (250 pcs) | RM 102.00 / 12 | RM 8.50 | **RM 9.50** | RM 10.80 | 12.0% | 10.5% (RM 1.00) |
-| **C1** | Singlet Bag 9×11 (5 pk) | RM 110.00 / 10 | RM 11.00 | **RM 12.20** | RM 13.50 | 9.6% | 9.8% (RM 1.20) |
-| **D1** | Sweetened Creamer (24 tins) | RM 128.00 / 2 | RM 64.00 | **RM 69.50** | RM 73.00 | 4.8% | 7.9% (RM 5.50) |
-| **E1** | Dishwashing Liquid 5 L | RM 46.00 / 4 | RM 11.50 | **RM 13.00** | RM 15.00 | 13.3% | 11.5% (RM 1.50) |
+| **A1** | 22oz PP Cups + Flat Lids | 10 | RM 135.00 | RM 13.50 | **RM 15.00** | RM 1.50 | 10.0% |
+| **A2** | 16oz PP Cups + Dome Lids | 10 | RM 120.00 | RM 12.00 | **RM 13.50** | RM 1.50 | 11.1% |
+| **B1** | 750ml Rect. Food Container + Lids | 10 | RM 110.00 | RM 11.00 | **RM 12.50** | RM 1.50 | 12.0% |
+| **C1** | Kraft Brown Lunch Box | 12 | RM 144.00 | RM 12.00 | **RM 13.50** | RM 1.50 | 11.1% |
+| **D1** | Evaporated / Condensed Milk | 8 | RM 160.00 | RM 20.00 | **RM 21.00** | RM 1.00 | **4.8%** |
+| **E1** | Takeaway Singlet Oxo-Bag + Straw | 10 | RM 90.00 | RM 9.00 | **RM 10.50** | RM 1.50 | **14.3%** |
 
-**`D1` is the margin trap.** It carries the largest absolute GP per unit (RM 5.50) but the thinnest percentage margin and the weakest saving. A stall can price-check `D1` against any sundry shop and see only 4.8%. Treat it as a basket anchor (drink Stalls order it weekly and reliably), never as the profit driver.
+**Five of six SKUs are priced to exactly RM 1.50 GP per Bundle.** That is a pricing *policy*, applied deliberately, not six independent market outcomes. It is defensible — it is simple to explain to a Stall and simple to compute — but it means the catalogue has **no margin headroom anywhere except `E1`**.
 
-**Every price above is a seed value.** From Phase 2 they live in `wholesaler_prices` and `pool_prices` with validity windows, and each batch snapshots the price in force at Cutoff into `route_batch_prices` (`ADR-0008`, `ADR-0002`).
+**`E1` is the only high-margin line** (14.3%) and the only one with room to absorb a Wholesaler increase. `D1` at 4.8% is the lowest, and it is also the highest-revenue line per Bundle (RM 21.00), so a 4.8% margin on it drags the blend down every time a drink Stall orders.
 
----
+**`D1` is not the basket anchor it was modelled as.** v1.1 treated `D1` as a RM 69.50 Bundle with 2 per carton. Measured, it is **RM 21.00 with 8 per carton** — a commodity line, not a high-value one. The field note confirms it still opens doors ("D1 remains the #1 door-opener for drink stalls"), but it earns RM 1.00 per Bundle against RM 1.50 for everything else.
 
-## 3. Basket Tiers
+**Measured stall saving is known for one SKU only.** S03 reported `C1` at RM 13.50 is **RM 0.50 cheaper** than their existing supplier — a **3.7%** saving, and they still bought, citing doorstep delivery as the reason. Every other saving figure in v1.1 was modelled and is now unverified. **Do not quote saving percentages to Stalls until they are measured per SKU.**
 
-Three observed Stall baskets. Each Stall sits in exactly one tier, per week.
-
-| Tier | Who | Composition | Bundles | **GMV** | **GP** |
-| :--- | :--- | :--- | ---: | ---: | ---: |
-| **Tier 1** | Small stall, partial adoption | A1×3, B1×1, C1×2 | 6 | **RM 78.90** | **RM 7.90** |
-| **Tier 2** | Full-adoption food stall | A1×5, A2×2, B1×2, C1×2, E1×1 | 12 | **RM 164.40** | **RM 16.80** |
-| **Tier 3** | Drink Stall (anchor) | D1×4, C1×2, E1×1 | 7 | **RM 315.40** | **RM 25.90** |
-
-**"1–3 Bundles per SKU per week" is the conservative framing, and the arithmetic is looser than it.** A Tier 2 Stall orders **12 bundles in total** across five SKUs, peaking at **A1 × 5** — twice the top of the stated range. The constraint that actually matters is the *total*: 6–12 bundles per Stall per week fits an 8×8 ft stall. Where "1–3" is used in outbound copy it is a sales simplification, not a system constraint, and it understates `A1` by 40%.
-
-Do not write `1–3` into code, validation, or the UI as a maximum. If a Stall orders 5 `A1`, that is a normal Tier 2 week, not an error.
-
-Rounding waste stays bounded regardless, at `M_i − 1` bundles per SKU.
-
-> **v1.0 said "RM 250 AOV".** No tier produces that. Tier 2 — the modal full-adoption food Stall — is **RM 164.40**. The RM 250 figure inflated every downstream number in v1.0 and is deleted.
+Prices live in `wholesaler_prices` and `pool_prices` with validity windows, snapshotted per batch into `route_batch_prices` at Cutoff (`ADR-0008`, `ADR-0002`).
 
 ---
 
-## 4. Route P&L
+## 3. Basket Spread — Measured, Not Three Tiers
 
-Two fleet scenarios, both fulfilled in **two Sorties** (`ADR-0016`). Both clear the gate. **The 12-Stall Route fits a Myvi; the 14-Stall Route does not.**
+v1.1 assumed three tidy tiers (RM 78.90 / RM 164.40 / RM 315.40). Two weeks of trading produced a **continuous spread**, not three clusters:
 
-| Line | **12-Stall Route** (2 × 6, Myvi) | **14-Stall Route** (2 × 7, Avanza-class) |
+| Batch | Delivered GMV per Stall, descending | Mean |
+| :--- | :--- | ---: |
+| **B01** | 285 · 276 · 228 · 218 · 188 · 152 · 135 · 125 · 50 | **RM 184.11** |
+| **B02** | 348 · 298 · 270 · 260 · 228 · 162 · 152 · 75 · 75 · 27 | **RM 189.60** |
+
+* **Range: RM 50 to RM 348.** A 7× spread between the smallest and largest Stall.
+* **Mean RM 186.86**, against a modelled Tier 2 of RM 164.40.
+* **Mean GP per Stall RM 18.66**, which is the number every Route-sizing decision now rests on.
+
+**Do not build a tier system into Phase 2.** The measured data does not support three discrete tiers, and a `basket_tier` enum in the schema would force every Stall into a bucket the data says does not exist. Store `ordered_bundles` per SKU; derive everything else from that. The `basket_tier` column in the Phase 1 workbook is retained as a *forecasting aid only* and must not be promoted to a schema constraint.
+
+**The bottom of the spread is a real business problem.** Two Stalls in B02 delivered only RM 75, and one B01 Stall delivered RM 50. Those Stalls consume a stop, a parking slot, and a share of the shift for 5% of the Route's GMV. A minimum viable basket is a Phase 2 *commercial* decision, not a software one — but the system must surface per-Stall GMV so the Founder can see who is below the line.
+
+> **v1.0 said "RM 250 AOV". v1.1 said three tiers. Both are deleted.** The measured mean is **RM 186.86** and the distribution is continuous.
+
+---
+
+## 4. Route P&L — Measured
+
+Two live shifts, both **one Sortie**, both clearing the `ADR-0009` gate.
+
+| Line | **B01 · 2026-10-15** | **B02 · 2026-10-22** |
 | :--- | ---: | ---: |
-| Stalls / composition | 12 (1 × T3 + 11 × T2) | 14 (2 × T3 + 12 × T2) |
-| Bundles delivered | 139 | 158 |
-| **GMV** | **RM 2,123.80** | **RM 2,603.60** |
-| Wholesaler COGS (cash out) | RM 2,182.00 | RM 2,484.00 |
-| **Realized GP (accrual)** | **RM 210.70** (9.92%) | **RM 253.40** (9.73%) |
-| Runner (2 sorties × RM 42.50) | (RM 85.00) | (RM 85.00) |
-| **Net Contribution Margin** | **RM 125.70** | **RM 168.40** |
-| Master Cartons / physical boxes | 19 PU / 28 boxes | 22 PU / 31 boxes |
-| Geometric volume / per Sortie @80% | 1,230 L / **770 L peak** | 1,318 L / **869 L + 778 L** (avg 824) |
-| Payload weight | 291 kg | 365 kg |
+| Stalls with a Preorder | 9 | 9 |
+| Spot sales | 0 | 1 (RM 27.00) |
+| Bundles delivered | 116 | 131 |
+| **GMV delivered** | **RM 1,657.00** | **RM 1,896.00** |
+| Wholesaler COGS (cash out) | RM 1,673.00 | RM 1,563.00 |
+| **Realized GP** | **RM 167.00** (10.08%) | **RM 187.50** (9.89%) |
+| Runner (1 Sortie) | (RM 42.50) | (RM 42.50) |
+| **Net Contribution Margin** | **RM 124.50** | **RM 145.00** |
+| Closing Buffer Stock at cost | RM 183.00 | RM 37.50 |
+| **Net Batch Cash Flow** | **−RM 58.50** | **+RM 290.50** |
+| Master Cartons / physical boxes | 13 / 18 | 12 / 17 |
+| Geometric volume | 901.5 L | 825.5 L |
+| Shift duration | 3.20 h | 2.50 h |
 | Gate (≥ RM 1,500 GMV, ≥ RM 150 GP) | ✓ | ✓ |
 
-> **Why 14 Stalls is the target mix.** A 14-Stall Route can be composed of two Tier-3 anchors (GP **RM 253.40**) or one (GP **RM 244.30**). The two-anchor mix is the better Route — higher GP *and* lower volume (824 L vs 863 L), because `D1` is dense and the mix needs fewer of the bulky `A1` cartons. The second drink Stall is worth ~RM 9 GP and ~39 L.
+**The reference Route is 9 Stalls, 12–13 Master Cartons, one Sortie, RM 42.50 of Runner cost.** Every downstream number in this pillar now derives from that, not from the 14-Stall Route.
 
-### 4.1 The vehicle is the binding constraint
+### 4.1 One Sortie, and the Myvi is the real ceiling
 
-**The 14-Stall Route requires an Avanza** (both rows folded, ~1,000 L) or equivalent: its heavier Sortie packs to 869 L, over the Myvi's 800 L. The 12-Stall Route fits a Myvi at 769 L per sortie — but with **31 L of headroom**, so any Stall upgrading from Tier 1 to Tier 2 breaks it. Plan for the Avanza-class vehicle; the Myvi is the fallback, not the target (`ADR-0015`).
+B01 loaded **13 cartons / 901.5 L** into a Myvi with the rear seats flat **and the front passenger seat occupied**. B02 loaded **12 cartons / 825.5 L** and fit cleanly.
 
-Sortie loads depend on **how cartons are allocated**, not just on how many Stalls a Cluster holds. Two worked cases:
+**Practical Myvi capacity is ~900 L geometric, not the modelled 1,280 L.** At the 92% packing efficiency measured (§4.2), 13 cartons is the ceiling for a single Sortie.
 
-* **12-Stall Route, Myvi** — **19** cartons, best balanced split 10 / 9, giving **770 L and 768 L packed**. Inside 800 L, but only just: a single Stall upgrading its basket pushes it over.
-* **14-Stall Route** — **22** cartons split 11 / 11, giving **869 L and 778 L packed**. The heavier Sortie exceeds 800 L, so it needs an Avanza-class vehicle.
+**9 Stalls is therefore the Myvi ceiling, and it is also where the gate barely passes.** These two limits meet almost exactly:
 
-The **824 L** figure quoted elsewhere is the *average* of the 14-Stall Route's two Sorties, never the load of either. This is exactly the kind of number that gets copied into a plan and quietly becomes wrong: `09_Backend_Schema.md` §9 records the executed test that produced these figures, and the app must compute them per batch rather than quote a constant.
+| Stalls | GMV `[EST]` | Realized GP `[EST]` | NCM | Cartons | Volume | Myvi |
+| ---: | ---: | ---: | ---: | ---: | ---: | :--- |
+| 9 (measured) | RM 1,776 | RM 177 | RM 135 | 12–13 | 826–902 L | ✓ at the limit |
+| 10 | RM 1,974 | RM 197 | RM 154 | 15 | ~1,040 L | ✗ second Sortie |
+| 12 | RM 2,369 | RM 236 | RM 194 | 19 | ~1,318 L | ✗ second Sortie |
 
-Weight is a non-issue: 365 kg against a ~500 kg MPV payload. **Do not plan vehicles by weight.**
+**This is the central Phase 2 tension.** A 9-Stall Route fits one Myvi Sortie but leaves only 1.1% of cost headroom (§6). A 12-Stall Route is comfortable on margin but needs a second Sortie at RM 42.50, or an Avanza-class vehicle. `ADR-0016`'s two-Sortie design remains correct — it is simply **not needed at 9 Stalls**, and Phase 2 must not hard-code either one.
 
-### 4.2 Two trips, not a hired van
+### 4.2 The packing factor was wrong by 15%
 
-A hired van at ~RM 150/shift consumes **59%** of a Route's RM 253.40 gross profit, leaving RM 103.40 — below what the Founder nets on the 12-Stall Myvi Route. Two sorties at RM 42.50 each is cheaper *and* preserves the vehicle already on hand.
+The model divides geometric volume by **0.80** to estimate packed volume. The field note records 901.5 L geometric packing to **~980 L** — an efficiency of **92%**.
+
+| Cartons | Geometric | Modelled packed (÷0.80) | Observed packed (92%) |
+| ---: | ---: | ---: | ---: |
+| 13 (B01) | 901.5 L | **1,127 L** — impossible in a Myvi | **980 L** — matches the field note |
+| 12 (B02) | 825.5 L | 1,032 L | 897 L |
+
+The modelled formula would have **rejected a load that actually fit**, and would have forced a second Sortie that was not needed. Phase 2 must use a **configurable `packing_efficiency`** on the vehicle, defaulting to `0.92`, not a hard-coded `0.80`. Two observations is thin evidence; the constant is provisional until a third shift confirms it.
+
+Weight remains a non-issue. **Do not plan vehicles by weight.**
 
 ### 4.3 Three margin figures — do not conflate them
 
 `ADR-0010` requires three distinct numbers, because the same batch has three different truths:
 
-| Figure | Basis | 14-Stall value | Purpose |
-| :--- | :--- | ---: | :--- |
-| **Forecast GP** | Ordered bundles, at Cutoff | RM 253.40 (if fully delivered) | The number you *expect*; already known Wednesday noon |
-| **Realized GP** | **Delivered** bundles only | RM 253.40 → lower if short | **The gate metric.** Accrual, not cash |
-| **Net Batch Cash Flow** | Cash in − cash out − Runner | RM 34.60 (week 1) | What actually hits the bank this week |
+| Figure | Basis | B01 | B02 | Purpose |
+| :--- | :--- | ---: | ---: | :--- |
+| **Forecast GP** | Ordered bundles, at Cutoff | RM 167.00 | RM 187.50 | What you *expect*; known Wednesday noon |
+| **Realized GP** | **Delivered** bundles only | RM 167.00 | RM 187.50 | **The gate metric.** Accrual, not cash |
+| **Net Batch Cash Flow** | Cash in − cash out − Runner | **−RM 58.50** | **+RM 290.50** | What hits the bank this week |
 
 The identity that ties them:
 
@@ -126,92 +155,94 @@ The identity that ties them:
 Realized GP − (closing Buffer at cost − opening Buffer at cost) − Sortie cost = Net Batch Cash Flow
 ```
 
-**Week 1**, where the opening buffer is zero and the Runner is paid once, this simplifies to:
+**B01**, opening buffer zero:
 
 ```
-RM 253.40 − RM 133.80 − RM 85.00 = RM 34.60
+167.00 − (183.00 − 0) − 42.50 = −RM 58.50
 ```
 
-The earlier draft of this section omitted the Runner term and printed RM 119.60, which is GP net of Buffer Stock but **before** the Runner was paid. The corrected Week-1 net cash is **RM 34.60**.
-
-**Week 2 onward it does not.** Starting with RM 133.80 of carried stock, a week that sells down the buffer shows a *higher* cash figure than its GP:
+**B02**, starting with RM 183.00 of carried stock:
 
 ```
-GP 210.70 − (close 144.80 − open 268.90) − 85.00 = 210.70 + 124.10 − 85.00 = RM 249.80
+187.50 − (37.50 − 183.00) − 42.50 = 187.50 + 145.50 − 42.50 = +RM 290.50
 ```
 
-That is the 12-Stall Route selling down last week's surplus. It looks like a good week, and it is — but part of it is the previous week's cash arriving late, not new profit.
+**B02's cash is nearly double its profit, and that is not growth.** It sold down RM 145.50 of stock it had already paid for in B01. The cash is real, the profit is RM 187.50, and only the second number is a run-rate.
 
-This is not an error term. It is the price of rounding Master Cartons up, and the **change** in buffer is what separates accrual profit from cash. A batch can show a healthy Realized GP and a negative cash week — the 12-Stall Route does exactly that in Week 1 (§5) — and a week showing strong cash can be selling its own stock.
+Both batches were verified against PostgreSQL 16.2 with the identity holding at `0.000000`. The schema's `v_route_batch_pnl` remains the authority; this table is its output.
 
 ---
 
 ## 5. Working Capital: The Sawtooth
 
-Sarpply pays the Wholesaler on Thursday collection (cash/DuitNow) and collects from Stalls on Thursday handover. But it must buy **whole Master Cartons** while selling **partial cartons**, so leftover bundles accumulate as Buffer Stock and then unwind.
+Sarpply pays the Wholesaler on Thursday collection and collects from Stalls on Thursday handover. But it buys **whole Master Cartons** while selling **partial cartons**, so leftover bundles accumulate as Buffer Stock and unwind later.
 
-**14-Stall Route, 12 weeks simulated:**
+**Measured, two weeks:**
 
-| Week | Cartons | Cash out | Buffer (bundles) | Buffer at cost | Net cash @ RM 85 |
-| ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 22 | RM 2,484.00 | 10 | RM 133.80 | RM 34.60 |
-| 2 | 20 | RM 2,290.00 | 6 | RM 73.60 | RM 228.60 |
-| 3 | 22 | RM 2,484.00 | 16 | RM 207.40 | RM 34.60 |
-| 5 | 20 | RM 2,226.00 | 2 | RM 23.00 | RM 292.60 |
-| 10 | 19 | RM 2,180.00 | 0 | RM 0.00 | RM 338.60 |
+| Batch | Cartons | Cash out | Buffer at cost | Net cash @ RM 42.50 |
+| :--- | ---: | ---: | ---: | ---: |
+| B01 | 13 | RM 1,673.00 | RM 183.00 | **−RM 58.50** |
+| B02 | 12 | RM 1,563.00 | RM 37.50 | **+RM 290.50** |
 
-* **Worst-week cash requirement: RM 2,484.00.** Not the RM 2,000 v1.0 assumed.
-* **Worst-week net cash: RM 34.60.** Some weeks earn almost nothing after the Runner is paid, because the cash went into the boot.
-* **12-week cumulative: RM 1,947.20**, against RM 3,040.80 of Realized GP — the RM 1,093.60 difference is Buffer Stock sitting in the vehicle.
+**Week 1 is a genuine cash loss.** B01 spent RM 1,673.00 to collect RM 1,657.00, then paid the Runner. The Founder is down RM 58.50 on the first Thursday. **This is the sawtooth working as designed** — the money is in the boot as Buffer Stock, and it comes back when the next batch sells it.
 
-**The 12-Stall Route is worse, and must be disclosed:**
+**Buffer Stock is now measured at RM 183.00 after Batch 1**, against RM 133.80 modelled. The buffer is the single largest source of cash volatility in the business and it moves by more than the entire weekly profit.
 
-* Week 1 cash out **RM 2,182.00** against **RM 2,123.80** GMV → **negative RM 58.20 cash spread**, and **−RM 143.20** after the Runner. The Founder tops up from personal funds for the first 2–3 weeks.
-* 12-week cumulative only **RM 1,397.60** — average **RM 116.47/shift**, because a 12-Stall Route rounds up more wastefully relative to its sales.
+**Founder operating rule:** hold **RM 2,600** of float before Week 1. Worst observed cash-out is RM 1,673.00, so there is comfortable headroom today — but the ceiling exists to stop carton volumes growing faster than the float, and the v1.1 warning stands: **do not raise carton volumes without raising this ceiling first.**
 
-**Founder operating rule:** hold **RM 2,600** of float before Week 1, and expect the first three Thursdays to feel like they are losing money. They are — the money is in the boot, and it comes back in weeks 4–10.
-
-**`max_intraday_po_cash_myr = 2600`** leaves only **RM 116** of headroom over the worst observed week. Do not raise carton volumes without raising this ceiling first.
+**`max_intraday_po_cash_myr = 2600`** is retained unchanged.
 
 ---
 
-## 6. Sensitivity: The Gate Breaks at +4.2%
+## 6. Sensitivity: The Gate Breaks at +1.1%
 
-The gate needs Realized GP ≥ RM 150 on a 14-Stall Route.
+This is the most important number in the document.
 
-| Carton cost move | Realized GP | Net @ RM 85 | Verdict |
-| :--- | ---: | ---: | :--- |
-| Baseline | RM 253.40 | RM 168.40 | ✓ |
-| **+4.16%** | **RM 150.07** | RM 65.07 | ✓ **at the edge** |
-| +5% | RM 129.20 | RM 44.20 | ✗ fails |
-| +10% | RM 5.00 | −RM 80.00 | ✗ catastrophic |
+The gate needs Realized GP ≥ RM 150. Measured GP is RM 167.00 (B01) and RM 187.50 (B02). The headroom is **RM 17.00** and **RM 37.50** — against delivery costs of RM 1,490.00 and RM 1,708.50.
 
-**A 4.2% Wholesaler price increase deletes the entire gate margin.** There is no comfortable buffer. This is why `ADR-0008` keys prices by Wholesaler and `ADR-0002` freezes them at Cutoff — a mid-week cost move discovered at Thursday pickup would be absorbed directly by Sarpply.
+| Batch | Realized GP | Headroom to gate | Delivery cost at cost | **Gate dies at** |
+| :--- | ---: | ---: | ---: | ---: |
+| **B01** | RM 167.00 | RM 17.00 | RM 1,490.00 | **+1.14%** |
+| **B02** | RM 187.50 | RM 37.50 | RM 1,708.50 | **+2.19%** |
 
-**`D1` stress test (the unreliable line):**
+**A 1.14% Wholesaler price increase erases Batch 1's entire gate margin.** That is roughly **RM 1.54 on a RM 135.00 `A1` carton**. The v1.1 claim of a 4.16% cushion was correct for a 14-Stall Route; at 9 Stalls the cushion is a quarter of that.
 
-| Scenario | GMV | Realized GP | Net @ RM 85 | Gate |
-| :--- | ---: | ---: | ---: | :--- |
-| 14-Stall, `D1` present | RM 2,603.60 | RM 253.40 | RM 168.40 | ✓ |
-| 14-Stall, **`D1 = 0`** | RM 2,047.60 | RM 209.40 | RM 124.40 | ✓ GP passes |
-| 12-Stall, **`D1 = 0`** | RM 1,845.80 | RM 188.70 | RM 103.70 | ✓ GP passes |
+**This is not a software problem, but it is a software requirement.** Phase 2 must:
 
-**Losing the drink anchor entirely still clears the RM 150 GP gate** — GMV drops 21% but GP only drops 17%, because `D1` has the worst margin in the catalogue. The Route survives its least reliable SKU, which is the right risk posture: one Stall category cannot sink a shift.
+1. Store every Wholesaler price with a validity window (`wholesaler_prices`) — never a mutable single value.
+2. Snapshot the price into `route_batch_prices` at Cutoff (`ADR-0008`).
+3. Compute headroom-to-gate as a **first-class output of reconciliation**, not a spreadsheet afterthought.
+4. Warn before a batch when the gate headroom falls below a configured floor.
+
+**The response to a price rise is volume, not price.** Stalls are already close to their incumbent suppliers (§2), so raising Pool Prices is the weaker lever. Adding 2–3 Stalls moves GP by RM 37–56, which is more than the entire measured gate headroom.
+
+| Carton cost move | B01 Realized GP | Verdict |
+| :--- | ---: | :--- |
+| Baseline | RM 167.00 | ✓ |
+| **+1.14%** | **RM 150.00** | ✓ at the edge |
+| +2% | RM 137.20 | ✗ fails |
+| +5% | RM 92.50 | ✗ fails badly |
+
+**Route sizing is now a margin decision, not a volume decision.** 9 Stalls is the minimum that passes; 11–12 gives a cushion worth roughly RM 40–75 of GP, at the cost of a second Sortie or a larger vehicle.
 
 ---
 
 ## 7. City Scaling (5 Routes, Kuching)
 
-5 Routes × 4.333 weeks = **21.67 shifts/month** — not the 40 batches v1.0 assumed (40 would need ~9 Routes, roughly every food court in Kuching).
+5 Routes × 4.333 weeks = **21.67 shifts/month**.
+
+Measured mean Route: GMV **RM 1,776.50**, Realized GP **RM 177.25**, Runner **RM 42.50**.
 
 | | GMV/mo | Realized GP/mo | Logistics/mo | **Net/mo** | Annual |
 | :--- | ---: | ---: | ---: | ---: | ---: |
-| **5 × 14-Stall Routes** | RM 56,407 | RM 5,490 | (RM 1,842) | **RM 3,648** | RM 43,781 |
-| **5 × 12-Stall Routes** | RM 46,012 | RM 4,565 | (RM 1,842) | **RM 2,723** | RM 32,679 |
+| **5 × 9-Stall Routes** (measured) | RM 38,488 | RM 3,840 | (RM 921) | **RM 2,919** | RM 35,028 |
+| **5 × 12-Stall Routes** `[EST]` | RM 51,336 | RM 5,114 | (RM 921) | **RM 4,192** | RM 50,304 |
 
-To reach the old **RM 6,200/month** claim requires **37 shifts ≈ 8.5 Routes** — about 105–120 Stalls. That is a Phase 3 target, not a Phase 2 plan.
+To reach the old **RM 6,200/month** claim needs **46.0 shifts ≈ 10.6 Routes** at the measured basket — about **96 Stalls**. That is a Phase 3 target.
 
-These are **contribution** figures. They exclude the Founder's time, phone/data, the `GLOSSARY.md`-mandated float, and any software cost. They are the number that must survive before Phase 2 engineering starts.
+These are **contribution** figures. They exclude the Founder's time, phone/data, the float, and any software cost.
+
+**Note the direction of travel.** v1.1 projected RM 3,648/month on 5 × 14-Stall Routes. The measured 9-Stall Route produces **RM 2,919/month** — RM 729 less per month, because the Route is smaller and the packing factor was optimistic. Scaling the business now depends on **adding Stalls per Route up to the vehicle limit**, not on adding Routes, because the Runner cost is per shift and is already halved.
 
 ---
 
@@ -222,7 +253,7 @@ For Route $r$, SKU $i$, Stall $s$:
 **1. Ordered bundles at Cutoff** — frozen; aggregation reads this and only this (`ADR-0002`):
 $$Q_{r,i} = \sum_{s \in r} q_{s,i}$$
 
-**2. Master Cartons to purchase** — Route-level pooling, not per-Cluster. Pooling both Clusters' demand saved **2 Master Cartons / RM 258 per week** on the 14-Stall reference (`ADR-0006`), because `A2` and `C1` each round up once across the Route instead of once per Cluster:
+**2. Master Cartons to purchase** — Route-level pooling, not per-Cluster (`ADR-0006`):
 $$C_{r,i} = \left\lceil \frac{\max(0, Q_{r,i} - S_{i,\text{prev}})}{M_i} \right\rceil$$
 
 **3. Ending Buffer Stock** — derived, never stored (`ADR-0007`):
@@ -231,36 +262,25 @@ $$S_{i,\text{end}} = S_{i,\text{prev}} + C_{r,i} \cdot M_i - \sum_{s \in r} \tex
 **4. Realized GP** — on **delivered** bundles, at the price locked in `route_batch_prices`:
 $$\text{GP}_r = \sum_i \left[ \text{delivered}_{r,i} \cdot (P_{r,i,\text{locked}} - \text{Cost}_{r,i,\text{locked}}) \right]$$
 
-**5. Net Contribution Margin:**
+**5. Net Contribution Margin** — one Sortie at the measured Route size:
 $$\text{NCM}_r = \text{GP}_r - (n_{\text{sorties}} \times 42.50)$$
 
-**6. Sortie capacity constraint** — enforced, not advisory (`ADR-0015`):
-$$\sum_{i \in \text{sortie}} \frac{C_{i} \cdot L_i}{0.80} \le V_{\max}$$
+**6. Gate headroom** — the number Phase 2 exists to protect:
+$$H_r = \frac{\text{GP}_r - 150}{\text{COGS}_{\text{delivered}}}$$
 
-Where $L_i$ = `carton_geometric_liters` and $V_{\max}$ = `vehicles.max_cargo_liters` (800 for Myvi, 1,000 for Avanza).
+Measured: $H_{B01} = 1.14\%$, $H_{B02} = 2.19\%$.
+
+**7. Sortie capacity constraint** — `packing_efficiency` measured at **0.92**, not 0.80 (`ADR-0015`):
+$$\sum_{i \in \text{sortie}} \frac{C_{i} \cdot L_i}{\varepsilon} \le V_{\max}, \quad \varepsilon = 0.92$$
+
+Where $L_i$ = `carton_geometric_liters` and $V_{\max}$ = `vehicles.max_cargo_liters` (800 for Myvi, 1,000 for Avanza). At $\varepsilon = 0.92$, 13 cartons of `A1`/`A2`/`B1`/`C1`/`D1`/`E1` occupy 980 L and fit a Myvi; at $\varepsilon = 0.80$ they occupy 1,127 L and do not. **The model must not reject loads that reality accepts.**
 
 ---
 
-## 9. Google Sheets MVP Formulas (`Wholesaler_Aggregator` tab)
+## 9. Google Sheets → Phase 1 Workbook
 
-```text
-# B: Total bundles ordered for this SKU this week (frozen at Cutoff)
-=SUMIF(Stall_Orders!D:D, A2, Stall_Orders!E:E)
+`10a_Phase_1_Tracking_Sheet.md` describes the instrument; the live workbook is `Sarpply_Phase_1_Tracking_Sheet_Master.xlsx`. Both are **superseded by Phase 2** and kept only as the historical record of the gate measurement.
 
-# D: Master Cartons to buy, net of carryover buffer (C) and carton size (E)
-=MAX(0, CEILING((B2 - C2) / E2, 1))
+Both share one structural defect that Phase 2 must not reproduce: **the SKU cost lives in a single global table with no batch dimension.** In the workbook, `2_Orders` reads cost from `0_SKU` while `4_Batch_PnL` reads it from `3_PO`. They agree only because the values happen to match. Perturbing one SKU's carton cost by RM 8 in Batch 2 alone drives the identity check to **+16.00** — a false alarm that looks exactly like a ledger bug.
 
-# F: New carryover buffer after Thursday delivery
-=(D2 * E2) + C2 - B2
-
-# G: Cash needed at Wholesaler pickup
-=D2 * VLOOKUP(A2, SKU_Master!A:H, 5, FALSE)
-
-# H: Physical boxes to load (A1/A2 = 2 boxes per price unit)
-=D2 * VLOOKUP(A2, SKU_Master!A:H, 7, FALSE)
-
-# I: Sortie load check — must be <= 800 (Myvi) or 1000 (Avanza)
-=SUMPRODUCT(D2:D7 * VLOOKUP(A2:A7, SKU_Master!A:H, 8, FALSE)) / 0.80
-```
-
-`C` (buffer) must be pasted as values each week — it is the *only* carryover between batches, and it is the field that makes Week 1's cash position look like a loss.
+Worse, updating `0_SKU` for a new batch **retroactively rewrites the previous batch's GP**, violating `ADR-0008`. This is precisely why `route_batch_prices` exists: prices are per batch, immutable after Cutoff, and never a single mutable row.

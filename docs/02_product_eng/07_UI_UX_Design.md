@@ -32,12 +32,12 @@ supersedes: v1.0 (2:30 PM single drop, RM 45 shift, 8-stall console, "Verified o
 ├───────────────────────────────────────────────────────────────┤
 │  KOD │ BARANG                        │ KEDAI   │ POOL         │
 │ ─────┼───────────────────────────────┼─────────┼────────────  │
-│ [A1] │ Bekas Tapau PP 650ml (50 set) │ RM16.50 │ RM15.00  9%  │
-│ [A2] │ Bekas Tapau PP 750ml (50 set) │ RM18.00 │ RM16.50  8%  │
-│ [B1] │ Kertas Bungkus Besar (250)    │ RM10.80 │ RM 9.50 12%  │
-│ [C1] │ Plastik Tapau 9x11 (5 pek)    │ RM13.50 │ RM12.20 10%  │
-│ [D1] │ Susu Krimer Manis 500g (24)   │ RM73.00 │ RM69.50  5%  │
-│ [E1] │ Sabun Cuci Pinggan 5L         │ RM15.00 │ RM13.00 13%  │
+│ [A1] │ Bekas Tapau 22oz + Penutup    │ —       │ RM15.00      │
+│ [A2] │ Bekas Tapau 16oz + Dome       │ —       │ RM13.50      │
+│ [B1] │ Bekas Makanan 750ml + Tutup   │ —       │ RM12.50      │
+│ [C1] │ Kotak Makanan Kertas          │ —       │ RM13.50      │
+│ [D1] │ Susu Sejat / Pekat (6 tin)    │ —       │ RM21.00      │
+│ [E1] │ Beg Tapau + Straw             │ —       │ RM10.50      │
 ├───────────────────────────────────────────────────────────────┤
 │  ⏰ Order tutup : RABU 12:00 tengah hari                      │
 │  🚚 Hantar      : KHAMIS petang (PERCUMA ke gerai)            │
@@ -202,24 +202,23 @@ A mismatch does not block the Runner; it records `cartons_received` and alerts t
 │ 📊 SARPPLY ADMIN — Route: Premier 101 + Gala City                     │
 │ Batch: Thu 29 Oct · State: CLOSED_AT_CUTOFF                           │
 ├───────────────────────────────────────────────────────────────────────┤
-│ Active Stalls: 14 / 14   Sorties: 2                                    │
-│ GMV RM 2,603.60 · Forecast GP RM 253.40 · Net cash RM 34.60 ⚠️         │
-│ Gate: ✅ GP ≥ RM 150 (headroom +4.16% on carton cost)                  │
+│ Active Stalls: 9 / 9   Sorties: 1                                      │
+│ GMV RM 1,896.00 · Forecast GP RM 187.50 · Net cash RM 290.50           │
+│ Gate: ✅ GP ≥ RM 150 (headroom +2.19% on carton cost) ⚠️ thin          │
 ├───────────────────────────────────────────────────────────────────────┤
 │ SKU │ Ordered │ S_prev │ Cartons │ Boxes │ S_end │ Cash    │ GMV       │
 │ ────┼─────────┼────────┼─────────┼───────┼───────┼─────────┼────────── │
-│ A1  │   60    │   0    │    6    │  12   │   0   │ RM 810  │ RM 900.00 │
-│ A2  │   24    │   0    │    3    │   6   │   6   │ RM 444  │ RM 396.00 │
-│ B1  │   24    │   0    │    2    │   2   │   0   │ RM 204  │ RM 228.00 │
-│ C1  │   28    │   0    │    3    │   3   │   2   │ RM 330  │ RM 341.60 │
-│ D1  │    8    │   0    │    4    │   4   │   0   │ RM 512  │ RM 556.00 │
-│ E1  │   14    │   0    │    4    │   4   │   2   │ RM 184  │ RM 182.00 │
+│ A1  │   28    │   0    │    3    │   6   │   2   │ RM 405  │ RM 420.00 │
+│ A2  │   18    │   0    │    2    │   4   │   2   │ RM 240  │ RM 243.00 │
+│ B1  │   26    │   0    │    3    │   3   │   4   │ RM 330  │ RM 325.00 │
+│ C1  │   20    │   0    │    2    │   2   │   4   │ RM 288  │ RM 270.00 │
+│ D1  │   14    │   0    │    2    │   2   │   2   │ RM 320  │ RM 294.00 │
+│ E1  │   10    │   0    │    1    │   1   │   0   │ RM  90  │ RM 105.00 │
 │ ────┼─────────┼────────┼─────────┼───────┼───────┼─────────┼────────── │
-│ TOT │  158    │        │   22    │  31   │  10   │ RM2,484 │ RM2,603.60│
-│     │         │        │         │       │       │         │ Buffer RM 133.80 │
+│ TOT │  116    │        │   13    │  18   │  14   │ RM1,673 │ RM1,657.00│
+│     │         │        │         │       │       │         │ Buffer RM 183.00 │
 ├───────────────────────────────────────────────────────────────────────┤
-│ Sortie 1 (Premier 101): 869 L / 1,000 L ✅  (11 cartons)              │
-│ Sortie 2 (Gala City):   778 L / 1,000 L ✅  (11 cartons)              │
+│ Sortie 1 (both Clusters): 980 L / 980 L ⚠️  (13 cartons, front seat)  │
 ├───────────────────────────────────────────────────────────────────────┤
 │ [ 📤 Send receipts ]  [ 📋 Copy Wholesaler PO ]  [ 🎧 Voice queue: 11 ]│
 └───────────────────────────────────────────────────────────────────────┘

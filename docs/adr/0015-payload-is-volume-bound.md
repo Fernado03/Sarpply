@@ -1,20 +1,39 @@
-# Payload is volume-bound, and one MPV trip cannot carry a gate-clearing Route
+# Payload is volume-bound, and vehicle class is decided by Stall count
 
-A Route's Master Cartons are limited by cargo **volume**, not weight — 22 cartons weigh ~365 kg against a 450–550 kg MPV payload, but need **1.32 m³** of space at 100 % geometric fill (**1.65 m³ at 80 %**, the realistic packing efficiency). Every documented folded-seat volume in the intended fleet (Alza 498 L with the third row folded, Myvi 800 L with the rear bench folded, Avanza ~1,000 L only with both rear rows down) is below what a Route that clears the RM 150 gross-profit gate requires in a single trip. **A Route shift is therefore two sorties, one per Cluster.**
+**Status: amended by Phase 1 measurement.** The original decision assumed a 14-Stall Route and concluded no single MPV trip could carry a gate-clearing load. The measured Route is **9 Stalls**, which fits **one Myvi trip**. The reasoning about volume still holds; the conclusion drawn from it did not.
+
+A Route's Master Cartons are limited by cargo **volume**, not weight — 13 cartons weigh ~150 kg against a 450–550 kg MPV payload. The constraint is litres.
+
+## Measured
+
+Batch 1 loaded **13 Master Cartons / 18 physical boxes / 901.5 L geometric** into a Myvi with the rear bench folded **and the front passenger seat occupied**. Batch 2 loaded **12 cartons / 17 boxes / 825.5 L** and fit cleanly.
+
+**The packing efficiency is 0.92, not 0.80.** The field record shows 901.5 L geometric occupying ~980 L. The original 0.80 divisor would have computed **1,127 L** for that same load and rejected it as impossible — it would have forced a second Sortie that the business did not need and could not afford at RM 42.50.
+
+| Load | Geometric | At 0.80 (modelled) | At 0.92 (measured) |
+| :--- | ---: | ---: | ---: |
+| B01, 13 cartons | 901.5 L | 1,127 L — rejected | **980 L — fit** |
+| B02, 12 cartons | 825.5 L | 1,032 L — rejected | 897 L — fit |
 
 ## Considered Options
 
-- **8 stalls in one Myvi trip** — RM 1,466 GMV / RM 143.50 GP, which fails the gate, and still needs 1,230 L at 80 % fill once `A1`/`A2` lids are counted as the separate cartons they are.
-- **12–14 stalls in one trip** — clears the gate at RM 211–253 GP, but needs 1,230–1,318 L geometric, i.e. 1.5–1.6 m³ at 80 %. A hired van at ~RM 150 a shift consumes 59 %–61 % of the Route's gross profit.
-- **Two sorties in one existing MPV** — 770 L peak (12-Stall, Myvi), or 869 L + 778 L (14-Stall, Avanza-class). Adds ~1 h and RM 85 of Runner cost, and lands at **RM 125.70–168.40** net.
-- **A1/A2 delivered on a separate day** — splits the basket and removes the anchor SKUs that drive adoption.
+- **One Myvi trip at 9 Stalls** — 12–13 cartons, 826–902 L geometric, 980 L packed. Clears the gate at RM 167–188 GP. **Accepted.**
+- **One Myvi trip at 12–14 Stalls** — needs 1,230–1,318 L geometric. Does not fit. Rejected.
+- **A hired van** — ~RM 150/shift against RM 177.25 of measured gross profit. Rejected: it consumes 85% of the margin.
+- **Delivering `A1`/`A2` on a separate day** — splits the basket and removes the anchor SKUs. Rejected.
 
 ## Consequences
 
-**Locked as Option 3: two sorties, one per Cluster, in the existing vehicle.** Procurement still pools at Route level (one PO), because rounding across two Clusters saves 3 Master Cartons / RM 347 per week.
+The capacity rule the app enforces is:
 
-The consequence is a hard capacity rule the app must enforce: `SUM(cartons × carton_geometric_liters) / 0.80 ≤ vehicles.max_cargo_liters`. A 14-Stall Route's cartons split 11 / 11 into **869 L and 778 L packed**; the heavier Sortie exceeds a Myvi's 800 L, so that Route requires Avanza-class. A 12-Stall Route's 19 cartons balance to **770 L and 768 L** and fit a Myvi with barely 30 L to spare. Per-Cluster rounding, which assigns each Sortie its own Cluster's cartons, is worse: a 7-Stall Cluster rounds to 12 price units and **911 L**, which fits nothing in the fleet — so the app must allocate cartons across Sorties rather than assume Cluster independence.
+```
+SUM(cartons × carton_geometric_liters) / packing_efficiency ≤ vehicles.max_cargo_liters
+```
 
-Exora folded-seat volume could not be sourced and is treated as **unquantified**, not assumed adequate.
+`packing_efficiency` is a **column on `vehicles`, defaulting to 0.92** — never a constant in application code. Two observations is thin evidence, and the whole point of the correction is that a hard-coded divisor was wrong by 15%.
 
-The `A1`/`A2` figures assume containers and lids ship in **two separate cartons** (54.0 L body + 51.8 L lids = 105.8 L per price unit, an **1.63×** understatement versus the nested 64.8 L). This is unverified for the Kuching Wholesaler and is Question 1 on Script A. If they nest, every Route gains one trip's worth of headroom — 22 cartons would drop to ~17 physical boxes and the 14-Stall Route would fit a Myvi. That single answer can halve the vehicle requirement, which is why it must be asked before any vehicle is chosen.
+**9 Stalls is the Myvi ceiling, and it is also the gate floor.** The two limits meet almost exactly, which is the defining constraint of Phase 2. A tenth Stall needs a second Sortie (adds RM 42.50) or an Avanza-class vehicle.
+
+**`A1`/`A2` ship as two separate boxes** — bodies and lids do not nest. This was the open question that could have halved the vehicle requirement; it is now answered, and it does not.
+
+Weight remains a non-issue. Do not plan vehicles by weight.

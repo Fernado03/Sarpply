@@ -24,20 +24,17 @@ supersedes: v1.0 (20% penetration / 8-stall cluster / nan-TW-kuching-hokkien / c
 
 v1.0 assumed 20% penetration of a 40-Stall zone — 8 Stalls — and called that a viable batch. It is not. An 8-Stall Cluster produces **RM 1,466.20 GMV and RM 143.50 GP**, failing the RM 1,500 / RM 150 gate *before* any Runner is paid (`03_Unit_Economics.md` §4).
 
-The Route needs **12–14 Stalls**. Against a 40-Stall zone that is **30%–35% penetration**, not 20%.
+**Measured over two weeks: 26 Stalls approached, 10 buying — 38% conversion.** Nine Preorder Stalls per Route is what actually clears the gate.
 
 | Penetration of a 40-Stall zone | Stalls | GMV | Realized GP | Gate |
 | :--- | ---: | ---: | ---: | :--- |
-| 20% (v1.0 assumption) | 8 | RM 1,466.20 | RM 143.50 | ✗ fails by RM 6.50 |
-| **30%** | 12 | RM 2,123.80 | RM 210.70 | ✓ passes |
-| **35%** | 14 | RM 2,603.60 | RM 253.40 | ✓ passes |
+| 20% (v1.0 assumption) | 8 | RM 1,466.20 | RM 143.50 | ✗ fails |
+| **22.5% — measured** | **9** | **RM 1,776.50** | **RM 177.25** | ✓ **passes** |
+| 30% `[EST]` | 12 | RM 2,369.00 | RM 236.00 | ✓ passes |
 
-**Two honest readings, and the Founder must pick one before Week 1:**
+**The two-zone question is now answered by the field.** Reading (a) won: one Route = Premier 101 (Cluster A) + Gala City (Cluster B), ~26 Stalls of combined catchment worked in two weeks. The two Clusters are 6–8 minutes apart, which is what makes a single Route shift possible at all.
 
-* **(a) Widen the zone.** Treat Premier 101 + Gala City as one Route catchment of ~60–70 Stalls. 20% of 65 is 13 Stalls — the original 20% assumption survives, but the catchment is **1.6× the stall count** v1.0 claimed (65 vs 40) and spans **two Clusters**, which is exactly what the two-Sortie fulfilment model already assumes.
-* **(b) Hold the zone, raise penetration.** Accept that Premier 101 alone must reach 30–35%. Defensible only if the Anchor Stall strategy genuinely cascades through one building. It is the single largest commercial risk in Phase 1.
-
-The rest of this document assumes **(a)**: one Route = Premier 101 (Cluster A) + Gala City (Cluster B). The two Clusters are ~6–8 minutes apart, which is what makes a single Route shift with two Sorties possible at all.
+**The binding constraint is the vehicle, not the catchment.** At 9 Stalls the Route loads 12–13 Master Cartons into a Myvi with the front seat occupied — 980 L packed at the measured 92% efficiency. Two further Stalls would require a second Sortie. Recruiting beyond 10 Stalls is therefore a **vehicle decision** before it is a sales decision.
 
 ---
 
@@ -103,12 +100,12 @@ Hi Boss! Order berkumpulan minggu ni dibuka sekarang, tutup esok
 ✅ Tak perlu bayar apa-apa hari ni
 
 HARGA POOL MINGGU NI:
-[A1] Bekas Tapau 650ml + Penutup (50 set)  = RM 15.00
-[A2] Bekas Tapau 750ml + Penutup (50 set)  = RM 16.50
-[B1] Kertas Bungkus Besar (250 keping)      = RM  9.50
-[C1] Plastik Tapau 9x11 (5 pek)             = RM 12.20
-[D1] Susu Krimer Manis 500g (24 tin)        = RM 69.50
-[E1] Sabun Cuci Pinggan 5L (1 botol)        = RM 13.00
+[A1] Bekas Tapau 22oz + Penutup Rata (10 bungkus)  = RM 15.00
+[A2] Bekas Tapau 16oz + Penutup Dome (10 bungkus)  = RM 13.50
+[B1] Bekas Makanan 750ml + Penutup (10 bungkus)    = RM 12.50
+[C1] Kotak Makanan Kertas (12 bungkus)             = RM 13.50
+[D1] Susu Sejat / Pekat (6 tin sekotak)            = RM 21.00
+[E1] Beg Plastik Tapau + Straw (10 bungkus)        = RM 10.50
 
 👇 Cara order: balas mesej ni dengan kod & kuantiti saja.
 Contoh: "A1 x 3, C1 x 2, E1 x 1"

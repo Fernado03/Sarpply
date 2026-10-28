@@ -24,7 +24,7 @@ Realized GP, not forecast. Measured on **Delivered Bundles**, so a shortfall can
 | Phase | Entry condition | Duration | Economics target |
 | :--- | :--- | :--- | :--- |
 | **0 — Setup** | None | 5 days | RM 0 fixed burn |
-| **1A — Founder pilot** | Supplier prices locked | ≥ 2 weeks | 12–14 Stalls, RM 2,123.80–2,603.60 GMV |
+| **1A — Founder pilot** | Supplier prices locked | ✅ done (2 weeks) | 9 Stalls, RM 1,657.00–1,896.00 GMV |
 | **1B — Runner pilot** | 1A complete; gate visible | ≥ 2 weeks | RM 125.70–168.40 net |
 | **★ GATE** | **2 consecutive weeks ≥ gate** | — | Decision point |
 | **2 — Platform build** | Gate cleared | 4 weeks | Make the manual work disappear |
