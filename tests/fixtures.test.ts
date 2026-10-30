@@ -69,6 +69,25 @@ describe('Phase 1 workbook fixtures', () => {
     ]);
   });
 
+  it('holds the reconciliation identity across B01 and B02', async () => {
+    const rows = await query<{
+      delivery_date: string;
+      net_cash: string;
+      residual: string;
+    }>(`SELECT b.delivery_date::text,
+              i.net_batch_cash_flow_myr::text AS net_cash,
+              i.identity_residual_myr::text AS residual
+       FROM v_route_batch_identity i
+       JOIN route_batches b ON b.id = i.route_batch_id
+       WHERE b.delivery_date IN (DATE '2026-10-15', DATE '2026-10-22')
+       ORDER BY b.delivery_date`);
+
+    expect(rows).toEqual([
+      { delivery_date: '2026-10-15', net_cash: '-58.50', residual: '0.00' },
+      { delivery_date: '2026-10-22', net_cash: '290.50', residual: '0.00' },
+    ]);
+  });
+
   it('stamps a source channel on every order row', async () => {
     const rows = await query<{ source_channel: string; count: string }>(
       `SELECT source_channel, COUNT(*)::text AS count

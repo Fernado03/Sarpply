@@ -213,8 +213,6 @@ export async function loadPhase1Fixtures(client: Client): Promise<void> {
   const wholesalerId = wholesaler.rows[0]?.id;
   if (!wholesalerId) throw new Error('seeded Wholesaler is missing');
 
-  const balances = new Map<string, { bundles: number; cost: number }>();
-
   for (const batchId of FIXTURE_BATCHES) {
     const batchOrders = orders.filter((order) => order.batchId === batchId);
     const batchPo = poLines.filter((line) => line.batchId === batchId);
@@ -321,74 +319,67 @@ export async function loadPhase1Fixtures(client: Client): Promise<void> {
       orderIds.set(`${order.stallCode}:${order.skuCode}`, inserted.rows[0].id);
     }
 
-    // Receipts first: stock is in the Vehicle before any handover.
+    // Receipts first: stock is in the Vehicle before any handover. The ledger
+    // function owns the weighted-average rule (ADR-0018); the loader only
+    // supplies the invoice cost per Bundle.
     for (const line of batchPo) {
       if (line.cartonsReceived === 0) continue;
       const perCarton = bundlesPerCarton.get(line.skuCode);
       if (!perCarton) throw new Error(`fixture SKU ${line.skuCode} is not seeded`);
-      const bundles = line.cartonsReceived * perCarton;
-      const unitCost = round2(line.cartonCost / perCarton);
       await client.query(
-        `INSERT INTO stock_movements
-           (sku_code, vehicle_id, quantity_bundles, unit_cost_myr, movement_type,
-            route_batch_id, idempotency_key, occurred_at)
-         VALUES ($1, $2, $3, $4, 'PURCHASE_RECEIPT', $5, $6, $7)`,
+        `SELECT fn_post_stock_movement(
+           p_sku_code => $1,
+           p_vehicle_id => $2,
+           p_quantity_bundles => $3,
+           p_movement_type => 'PURCHASE_RECEIPT',
+           p_idempotency_key => $4,
+           p_unit_cost_myr => $5,
+           p_route_batch_id => $6,
+           p_occurred_at => $7
+         )`,
         [
           line.skuCode,
           vehicleId,
-          bundles,
-          unitCost,
-          batchUuid,
+          line.cartonsReceived * perCarton,
           `FIXTURE:${batchId}:${line.skuCode}:RECEIPT`,
+          round2(line.cartonCost / perCarton),
+          batchUuid,
           atMyTime(deliveryDate, '07:45:00'),
         ],
       );
-      const balance = balances.get(line.skuCode) ?? { bundles: 0, cost: 0 };
-      balances.set(line.skuCode, {
-        bundles: balance.bundles + bundles,
-        cost: balance.cost + bundles * unitCost,
-      });
     }
 
-    // Then deliveries, in stable Stall/SKU order, at the weighted average.
+    // Then deliveries in stable Stall/SKU order; the function refuses overdraw.
     const sortedOrders = [...batchOrders].sort((a, b) =>
       `${a.stallCode}:${a.skuCode}`.localeCompare(`${b.stallCode}:${b.skuCode}`),
     );
     for (const order of sortedOrders) {
       if (order.delivered === 0) continue;
-      const balance = balances.get(order.skuCode);
-      if (!balance || balance.bundles < order.delivered) {
-        throw new Error(
-          `fixture batch ${batchId} has no stock for ${order.stallCode} ${order.skuCode}`,
-        );
-      }
-      const unitCost = round2(balance.cost / balance.bundles);
       const orderId = orderIds.get(`${order.stallCode}:${order.skuCode}`);
       if (!orderId) throw new Error(`fixture order id missing for ${order.stallCode}`);
 
       await client.query(
-        `INSERT INTO stock_movements
-           (sku_code, vehicle_id, quantity_bundles, unit_cost_myr, movement_type,
-            route_batch_id, stall_order_id, idempotency_key, occurred_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        `SELECT fn_post_stock_movement(
+           p_sku_code => $1,
+           p_vehicle_id => $2,
+           p_quantity_bundles => $3,
+           p_movement_type => $4,
+           p_idempotency_key => $5,
+           p_route_batch_id => $6,
+           p_stall_order_id => $7,
+           p_occurred_at => $8
+         )`,
         [
           order.skuCode,
           vehicleId,
           -order.delivered,
-          unitCost,
           order.orderType === 'SPOT' ? 'SPOT_SALE' : 'DELIVERY',
+          `FIXTURE:${batchId}:${order.skuCode}:${orderId}`,
           batchUuid,
           orderId,
-          `FIXTURE:${batchId}:${orderId}`,
           atMyTime(deliveryDate, '15:00:00'),
         ],
       );
-
-      const remaining = balance.bundles - order.delivered;
-      balances.set(order.skuCode, {
-        bundles: remaining,
-        cost: remaining === 0 ? 0 : balance.cost - order.delivered * unitCost,
-      });
     }
   }
 }

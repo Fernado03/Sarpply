@@ -25,6 +25,23 @@ describe('append-only ledger', () => {
   });
 });
 
+describe('ledger posting contract', () => {
+  it('refuses an outbound movement larger than the balance', async () => {
+    const [vehicle] = await query<{ id: string }>("SELECT id FROM vehicles WHERE label = 'Myvi'");
+    const rejection = await expectRejected(
+      `SELECT fn_post_stock_movement(
+         p_sku_code => 'A1',
+         p_vehicle_id => $1,
+         p_quantity_bundles => -99999,
+         p_movement_type => 'DAMAGE_WRITE_OFF',
+         p_idempotency_key => 'TEST:OVERDRAW'
+       )`,
+      [vehicle.id],
+    );
+    expect(rejection.message).toContain('cannot post');
+  });
+});
+
 describe('provider message idempotency', () => {
   it('stores a redelivered provider message once', async () => {
     const providerMessageId = `wamid.test.${randomUUID()}`;
