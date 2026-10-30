@@ -12,15 +12,7 @@ import { broadcastBatch, deliverPendingMessages } from '@/lib/broadcast';
 import { pool } from '@/lib/db';
 import { createMessagingPort } from '@/lib/messaging';
 import { parseOrderText } from '@/lib/order-text';
-
-function field(formData: FormData, name: string): string {
-  const value = formData.get(name);
-  return typeof value === 'string' ? value : '';
-}
-
-function failure(error: unknown): string {
-  return error instanceof Error && error.message ? error.message : 'Something went wrong.';
-}
+import { failure, field } from './form';
 
 function skuOrNull(value: string): string | null {
   const skuCode = value.trim().toUpperCase();

@@ -260,7 +260,9 @@ footer {
 .field select,
 .field textarea,
 .draft-line select,
-.draft-line input {
+.draft-line input,
+.vehicle-form select,
+.receipt-line input {
   width: 100%;
   min-height: 44px;
   border: 1px solid var(--line);
@@ -325,6 +327,60 @@ button.primary {
   .draft-line {
     grid-template-columns: 1fr;
   }
+}
+
+.vehicle-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.vehicle-form select {
+  flex: 1 1 14rem;
+}
+
+.copy-list {
+  margin-top: 12px;
+}
+
+.copy-list summary {
+  cursor: pointer;
+  padding: 8px 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.copy-list textarea {
+  width: 100%;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  padding: 10px 12px;
+  resize: vertical;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.receipt-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.receipt-line {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) 6rem;
+  gap: 8px;
+  align-items: center;
 }
 
 section h3 {

@@ -1,6 +1,8 @@
 import { commitDraft, retryMessages, saveTextDraft, sendBroadcast } from './actions';
+import { confirmVehicle, receivePurchaseOrder, submitPurchaseOrder } from './purchase-actions';
 import { loadConsole, nextAction, statusLabel } from '@/lib/console';
 import { loadOpenDrafts } from '@/lib/intake';
+import { loadPurchase, purchaseListText } from '@/lib/purchase';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +23,7 @@ export default async function Page({ searchParams }: PageProps) {
   const view = await loadConsole();
 
   const intakeError = typeof params.intakeError === 'string' ? params.intakeError : null;
+  const purchaseError = typeof params.purchaseError === 'string' ? params.purchaseError : null;
   const notice = typeof params.notice === 'string' ? params.notice : null;
   const sentCount = typeof params.sent === 'string' ? params.sent : '0';
   const failedCount = typeof params.failed === 'string' ? params.failed : '0';
@@ -52,6 +55,29 @@ export default async function Page({ searchParams }: PageProps) {
   const open = batch.status === 'OPEN_FOR_ORDERS';
   const failedOutbound = outboundMessages.filter((message) => message.status === 'FAILED').length;
   const drafts = await loadOpenDrafts(batch.id);
+  const purchase = await loadPurchase(batch.id);
+  const frozen = batch.status !== 'OPEN_FOR_ORDERS';
+  const canConfirmVehicle =
+    !purchase.vehicleConfirmed &&
+    (batch.status === 'OPEN_FOR_ORDERS' || batch.status === 'CLOSED_AT_CUTOFF');
+  const shortLines = purchase.po?.lines.filter((line) => (line.cartonsShort ?? 0) > 0) ?? [];
+  const purchaseText = frozen
+    ? purchaseListText(
+        batch.routeName,
+        batch.deliveryDate,
+        batch.vehicleLabel,
+        batch.sortieCount,
+        purchase.lines,
+      )
+    : '';
+  const purchaseTotal = purchase.lines.reduce(
+    (sum, line) => ({
+      cartons: sum.cartons + line.cartons,
+      boxes: sum.boxes + line.physicalBoxes,
+      cash: sum.cash + Number(line.cashMyr ?? 0),
+    }),
+    { cartons: 0, boxes: 0, cash: 0 },
+  );
 
   return (
     <main>
@@ -62,6 +88,16 @@ export default async function Page({ searchParams }: PageProps) {
         <p className="notice error" role="alert">
           {intakeError}
         </p>
+      ) : null}
+      {purchaseError ? (
+        <p className="notice error" role="alert">
+          {purchaseError}
+        </p>
+      ) : null}
+      {notice === 'vehicle' ? <p className="notice">Vehicle confirmed for the batch.</p> : null}
+      {notice === 'po' ? <p className="notice">Wholesaler PO submitted.</p> : null}
+      {notice === 'received' ? (
+        <p className="notice">Receipt recorded. Cash follows the cartons received.</p>
       ) : null}
       {notice === 'saved' ? (
         <p className="notice">Draft saved. Review the lines, then commit.</p>
@@ -126,6 +162,246 @@ export default async function Page({ searchParams }: PageProps) {
                 </li>
               ))}
             </ul>
+          </>
+        )}
+      </section>
+
+      <section>
+        <h2>Purchase plan</h2>
+        {!frozen ? (
+          <p className="empty">The purchase list appears once Cutoff freezes the prices.</p>
+        ) : (
+          <>
+            <div className="card">
+              <div className="card-head">
+                <strong>Vehicle {batch.vehicleLabel}</strong>
+                <span className={purchase.vehicleConfirmed ? 'badge' : 'badge closed'}>
+                  {purchase.vehicleConfirmed ? 'Confirmed' : 'Not confirmed'}
+                </span>
+              </div>
+              <p className="stall-meta">
+                {purchase.vehicleConfirmed
+                  ? `Confirmed ${purchase.vehicleConfirmedAt}`
+                  : 'Confirm the Vehicle before the Wholesaler PO.'}
+              </p>
+              {canConfirmVehicle ? (
+                <form action={confirmVehicle} className="vehicle-form">
+                  <input type="hidden" name="batchId" value={batch.id} />
+                  <select
+                    name="vehicleId"
+                    defaultValue={purchase.vehicleId}
+                    aria-label="Vehicle"
+                  >
+                    {purchase.vehicles.map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.id}>
+                        {vehicle.label} · {vehicle.maxCargoLiters} L · {vehicle.packingEfficiency}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="submit" className="secondary">
+                    Confirm Vehicle
+                  </button>
+                </form>
+              ) : null}
+            </div>
+
+            <h3>Sortie load</h3>
+            {purchase.sorties.length === 0 ? (
+              <p className="empty">No cartons to load: Buffer Stock covers every Preorder.</p>
+            ) : (
+              <ul className="stall-list">
+                {purchase.sorties.map((sortie) => (
+                  <li key={sortie.tripNumber}>
+                    <span className="stall-code">Sortie {sortie.tripNumber}</span>
+                    <span>{sortie.cartons} cartons</span>
+                    <span className="stall-meta">
+                      {sortie.packedLiters} L of {sortie.maxCargoLiters} L ·{' '}
+                      {sortie.packingEfficiency} packing
+                    </span>
+                    <span className={sortie.fits ? 'badge' : 'badge closed'}>
+                      {sortie.fits ? 'Fits' : 'Over capacity'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {purchase.sorties.some((sortie) => !sortie.fits) ? (
+              <p className="notice error">
+                A Sortie exceeds the Vehicle. The Wholesaler PO is refused until the plan fits.
+              </p>
+            ) : null}
+
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Item</th>
+                    <th>Ordered</th>
+                    <th>Buffer</th>
+                    <th>Cartons</th>
+                    <th>Boxes</th>
+                    <th>Litres</th>
+                    <th>Carton cost</th>
+                    <th>Cash</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchase.lines.map((line) => (
+                    <tr key={line.skuCode}>
+                      <td>{line.skuCode}</td>
+                      <td>{line.nameEn}</td>
+                      <td>{line.orderedBundles}</td>
+                      <td>{line.bufferBundles}</td>
+                      <td>{line.cartons}</td>
+                      <td>{line.physicalBoxes}</td>
+                      <td>{line.geometricLiters}</td>
+                      <td>{rm(line.cartonCost)}</td>
+                      <td>{rm(line.cashMyr)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={4}>Total</td>
+                    <td>{purchaseTotal.cartons}</td>
+                    <td>{purchaseTotal.boxes}</td>
+                    <td></td>
+                    <td></td>
+                    <td>{rm(purchaseTotal.cash.toFixed(2))}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <details className="copy-list">
+              <summary>Copyable purchase list</summary>
+              <textarea
+                readOnly
+                defaultValue={purchaseText}
+                rows={Math.max(6, purchaseText.split('\n').length)}
+                aria-label="Copyable purchase list"
+              />
+            </details>
+
+            {batch.status === 'CLOSED_AT_CUTOFF' && !purchase.po ? (
+              <form action={submitPurchaseOrder} className="card intake-form">
+                <input type="hidden" name="batchId" value={batch.id} />
+                <label className="field">
+                  <span>Wholesaler</span>
+                  <select
+                    name="wholesalerId"
+                    defaultValue={purchase.wholesalers[0]?.id ?? ''}
+                    required
+                  >
+                    {purchase.wholesalers.map((wholesaler) => (
+                      <option key={wholesaler.id} value={wholesaler.id}>
+                        {wholesaler.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button type="submit" className="primary">
+                  Submit Wholesaler PO
+                </button>
+              </form>
+            ) : null}
+
+            {purchase.po ? (
+              <div className="card">
+                <div className="card-head">
+                  <strong>Wholesaler PO · {purchase.po.wholesalerName}</strong>
+                  <span className={purchase.po.receivedAt ? 'badge' : 'badge closed'}>
+                    {purchase.po.receivedAt ? 'Received' : 'Submitted'}
+                  </span>
+                </div>
+                <dl className="facts">
+                  <div>
+                    <dt>Submitted</dt>
+                    <dd>{purchase.po.submittedAt}</dd>
+                  </div>
+                  {purchase.po.receivedAt ? (
+                    <div>
+                      <dt>Received</dt>
+                      <dd>{purchase.po.receivedAt}</dd>
+                    </div>
+                  ) : null}
+                  <div>
+                    <dt>Cash required</dt>
+                    <dd>
+                      {purchase.po.receivedAt
+                        ? rm(purchase.po.cashRequired)
+                        : 'Set by received cartons'}
+                    </dd>
+                  </div>
+                </dl>
+
+                {shortLines.length > 0 ? (
+                  <p className="notice error">
+                    Short receipt: {shortLines
+                      .map((line) => `${line.skuCode} short ${line.cartonsShort}`)
+                      .join(', ')}
+                    . Cash uses what arrived; nothing is corrected silently.
+                  </p>
+                ) : null}
+
+                <div className="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>SKU</th>
+                        <th>Ordered</th>
+                        <th>Received</th>
+                        <th>Short</th>
+                        <th>Carton cost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {purchase.po.lines.map((line) => (
+                        <tr key={line.skuCode}>
+                          <td>{line.skuCode}</td>
+                          <td>{line.cartonsOrdered}</td>
+                          <td>{line.cartonsReceived ?? '—'}</td>
+                          <td>{line.cartonsShort ?? '—'}</td>
+                          <td>{rm(line.cartonCost)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {batch.status === 'PO_SUBMITTED' ? (
+                  <form action={receivePurchaseOrder} className="card intake-form">
+                    <input type="hidden" name="poId" value={purchase.po.id} />
+                    <p className="stall-meta">
+                      Record what arrived at the loading bay. Re-submitting the same counts
+                      writes nothing.
+                    </p>
+                    <ul className="receipt-lines">
+                      {purchase.po.lines.map((line) => (
+                        <li key={line.skuCode} className="receipt-line">
+                          <span className="stall-code">{line.skuCode}</span>
+                          <span className="stall-meta">Ordered {line.cartonsOrdered}</span>
+                          <input
+                            name={`received-${line.skuCode}`}
+                            type="number"
+                            min="0"
+                            max={line.cartonsOrdered}
+                            defaultValue={line.cartonsOrdered}
+                            inputMode="numeric"
+                            required
+                            aria-label={`Cartons received for ${line.skuCode}`}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                    <button type="submit" className="primary">
+                      Record received cartons
+                    </button>
+                  </form>
+                ) : null}
+              </div>
+            ) : null}
           </>
         )}
       </section>

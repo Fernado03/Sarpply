@@ -53,6 +53,23 @@ same text twice even though the message row stays single.
 Alternatively point `DATABASE_URL` at an existing PostgreSQL 16 server (see `.env.example`) and
 skip `db:dev`. Next.js loads `.env.local` automatically; the scripts do too.
 
+## Purchase and receipt
+
+After Cutoff the console shows the purchase list for the batch: Ordered Bundles, Buffer Stock on
+hand, cartons to buy, physical boxes, geometric litres, the frozen carton cost and cash. The plan
+is net of Buffer Stock and priced from the Cutoff snapshot, never a live price. A copyable text
+version is rendered for the Wholesaler.
+
+The Founder confirms the batch Vehicle. Route cartons are rounded once, then allocated to Sorties
+as whole cartons by largest remainder (`ADR-0019`); the Sortie capacity check uses that
+allocation. `fn_submit_wholesaler_po` refuses a plan whose Sortie exceeds the Vehicle's
+`max_cargo_liters` before writing the one Wholesaler PO.
+
+At the loading bay, `fn_receive_po` records cartons received per SKU. It writes the PO lines, sets
+the received time, derives `cash_required_myr` from cartons received (not ordered), and posts one
+`PURCHASE_RECEIPT` movement per line at the frozen carton cost. A short receipt stays visible; a
+retry with the same counts writes nothing, and a different count is refused.
+
 ## Tests
 
 ```bash
