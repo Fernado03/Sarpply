@@ -1,5 +1,6 @@
 import { commitDraft, retryMessages, saveTextDraft, sendBroadcast } from './actions';
-import { confirmHandover } from './handover-actions';
+import { HandoverLines } from './handover-lines';
+import { confirmHandover, sendHandoverReceipt } from './handover-actions';
 import { confirmVehicle, receivePurchaseOrder, submitPurchaseOrder } from './purchase-actions';
 import { loadConsole, nextAction, statusLabel } from '@/lib/console';
 import { loadHandover, receiptLabel, type HandoverStallView, type RunnerSessionView } from '@/lib/handover';
@@ -39,27 +40,7 @@ function HandoverForm({
         Ordered total {rm(stall.orderedTotalMyr)}. Enter the Bundles actually handed
         over; the receipt total follows those counts.
       </p>
-      <ul className="receipt-lines">
-        {stall.lines.map((line) => (
-          <li key={line.orderId} className="receipt-line">
-            <span className="stall-code">{line.skuCode}</span>
-            <span className="stall-meta">
-              {line.nameEn} · ordered {line.orderedBundles} · {rm(line.unitPrice)} per{' '}
-              {line.bundleUnitName.toLowerCase()}
-            </span>
-            <input
-              name={`delivered-${line.orderId}`}
-              type="number"
-              min="0"
-              max={line.orderedBundles}
-              inputMode="numeric"
-              required
-              placeholder={`Ordered ${line.orderedBundles}`}
-              aria-label={`Delivered Bundles for ${line.skuCode}`}
-            />
-          </li>
-        ))}
-      </ul>
+      <HandoverLines stall={stall} />
       <label className="field">
         <span>Payment method</span>
         <select name="paymentStatus" defaultValue="UNPAID">
@@ -79,8 +60,7 @@ function HandoverForm({
       {runners.length > 0 ? (
         <label className="field">
           <span>Runner</span>
-          <select name="attestedBy" defaultValue={runners[0].id}>
-            <option value="">No Runner session</option>
+          <select name="attestedBy" defaultValue={runners[0].id} required>
             {runners.map((runner) => (
               <option key={runner.id} value={runner.id}>
                 {runner.identity}
@@ -89,8 +69,9 @@ function HandoverForm({
           </select>
         </label>
       ) : (
-        <p className="stall-meta">
-          No Runner session for this batch; the attestation records the time only.
+        <p className="notice error">
+          No Runner session for this batch. Start a Runner shift before handing over;
+          the attestation must record who attested it.
         </p>
       )}
       {!stall.hasPhone ? (
@@ -99,7 +80,7 @@ function HandoverForm({
           message is sent.
         </p>
       ) : null}
-      <button type="submit" className="primary">
+      <button type="submit" className="primary" disabled={runners.length === 0}>
         Confirm handover and send receipt
       </button>
     </form>
@@ -155,9 +136,17 @@ function HandoverSummary({ stall }: { stall: HandoverStallView }) {
       ) : null}
       {stall.receiptStatus === 'FAILED' ? (
         <p className="notice error">
-          Receipt failed: {stall.receiptFailure ?? 'send failed'}. Use Send pending in
-          the message log.
+          Receipt failed: {stall.receiptFailure ?? 'send failed'}.
         </p>
+      ) : null}
+      {stall.outboundMessageId &&
+      (stall.receiptStatus === 'QUEUED' || stall.receiptStatus === 'FAILED') ? (
+        <form action={sendHandoverReceipt}>
+          <input type="hidden" name="messageId" value={stall.outboundMessageId} />
+          <button type="submit" className="secondary">
+            Send receipt
+          </button>
+        </form>
       ) : null}
       {stall.receiptBody ? (
         <details className="copy-list">
@@ -183,6 +172,8 @@ export default async function Page({ searchParams }: PageProps) {
   const handoverSendError =
     typeof params.handoverSendError === 'string' ? params.handoverSendError : null;
   const handoverCreated = typeof params.created === 'string' ? params.created : null;
+  const receiptError = typeof params.receiptError === 'string' ? params.receiptError : null;
+  const receiptOutcome = typeof params.receipt === 'string' ? params.receipt : null;
   const notice = typeof params.notice === 'string' ? params.notice : null;
   const sentCount = typeof params.sent === 'string' ? params.sent : '0';
   const failedCount = typeof params.failed === 'string' ? params.failed : '0';
@@ -212,7 +203,7 @@ export default async function Page({ searchParams }: PageProps) {
     clusters.set(stall.cluster, [...(clusters.get(stall.cluster) ?? []), stall]);
   }
   const open = batch.status === 'OPEN_FOR_ORDERS';
-  const unsentOutbound = outboundMessages.filter((message) => message.status !== 'SENT').length;
+  const failedOutbound = outboundMessages.filter((message) => message.status === 'FAILED').length;
   const drafts = await loadOpenDrafts(batch.id);
   const purchase = await loadPurchase(batch.id);
   const handover = await loadHandover(batch.id);
@@ -252,6 +243,11 @@ export default async function Page({ searchParams }: PageProps) {
           {handoverError}
         </p>
       ) : null}
+      {receiptError ? (
+        <p className="notice error" role="alert">
+          {receiptError}
+        </p>
+      ) : null}
       {notice === 'vehicle' ? <p className="notice">Vehicle confirmed for the batch.</p> : null}
       {notice === 'po' ? <p className="notice">Wholesaler PO submitted.</p> : null}
       {notice === 'received' ? (
@@ -268,7 +264,16 @@ export default async function Page({ searchParams }: PageProps) {
           {handoverCreated === '0'
             ? 'Handover already recorded; nothing changed.'
             : 'Handover recorded.'}
-          {handoverSendError ? ` Sending is unavailable: ${handoverSendError}` : ''}
+          {handoverSendError ? ` Receipt not sent: ${handoverSendError}` : ''}
+        </p>
+      ) : null}
+      {notice === 'receipt' ? (
+        <p className={`notice${receiptOutcome === 'failed' ? ' error' : ''}`}>
+          {receiptOutcome === 'sent'
+            ? 'Receipt sent.'
+            : receiptOutcome === 'failed'
+              ? 'Receipt send failed; it stays queued for retry.'
+              : 'Receipt was already sent or is no longer available.'}
         </p>
       ) : null}
       {notice === 'broadcast' || notice === 'retried' ? (
@@ -770,11 +775,11 @@ export default async function Page({ searchParams }: PageProps) {
               </button>
             </form>
           ) : null}
-          {unsentOutbound > 0 ? (
+          {failedOutbound > 0 ? (
             <form action={retryMessages}>
               <input type="hidden" name="batchId" value={batch.id} />
               <button type="submit" className="secondary">
-                Send pending ({unsentOutbound})
+                Retry failed ({failedOutbound})
               </button>
             </form>
           ) : null}

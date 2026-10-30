@@ -122,7 +122,9 @@ export async function loadHandover(routeBatchId: string): Promise<HandoverView> 
 
   const linesByStall = new Map<string, HandoverLineView[]>();
   for (const line of lines.rows) {
-    linesByStall.set(line.stallId, [...(linesByStall.get(line.stallId) ?? []), line]);
+    const group = linesByStall.get(line.stallId);
+    if (group) group.push(line);
+    else linesByStall.set(line.stallId, [line]);
   }
 
   return {
@@ -154,9 +156,15 @@ export async function loadStallPreorderLines(
 
 export async function recordStallHandover(
   input: HandoverInput,
-): Promise<{ handoverId: string; created: boolean }> {
-  const { rows } = await pool.query<{ handoverId: string; created: boolean }>(
-    `SELECT handover_id AS "handoverId", created
+): Promise<{ handoverId: string; outboundMessageId: string | null; created: boolean }> {
+  const { rows } = await pool.query<{
+    handoverId: string;
+    outboundMessageId: string | null;
+    created: boolean;
+  }>(
+    `SELECT handover_id AS "handoverId",
+            outbound_message_id AS "outboundMessageId",
+            created
        FROM fn_record_stall_handover($1, $2, $3::jsonb, $4, $5, $6, $7)`,
     [
       input.routeBatchId,

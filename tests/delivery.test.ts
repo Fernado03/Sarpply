@@ -120,9 +120,13 @@ async function recordHandover(
   lines: DeliveredLine[],
   paymentStatus: string,
   options: HandoverOptions = {},
-): Promise<{ handover_id: string; created: boolean }> {
-  const { rows } = await db.query<{ handover_id: string; created: boolean }>(
-    `SELECT handover_id, created
+): Promise<{ handover_id: string; outbound_message_id: string | null; created: boolean }> {
+  const { rows } = await db.query<{
+    handover_id: string;
+    outbound_message_id: string | null;
+    created: boolean;
+  }>(
+    `SELECT handover_id, outbound_message_id, created
        FROM fn_record_stall_handover($1, $2, $3::jsonb, $4, $5, $6, $7, $8)`,
     [
       routeBatchId,
@@ -205,6 +209,40 @@ describe('Stall handover', () => {
       await receiveStock(db, batchId, 'C1', 10, '12.00');
       const sessionId = await createRunnerSession(db, batchId);
 
+      const missingAttester = await recordHandoverSql(
+        db,
+        batchId,
+        stallId,
+        [
+          { stallOrderId: a1, deliveredBundles: 3 },
+          { stallOrderId: c1, deliveredBundles: 2 },
+        ],
+        'PAID_CASH',
+        {},
+      );
+      expect(missingAttester.message).toContain('needs the attesting Runner session');
+
+      const expired = await db.query<{ id: string }>(
+        `INSERT INTO runner_sessions
+           (runner_identity, route_batch_id, shift_starts_at, shift_ends_at, expires_at)
+         VALUES ('Expired Runner', $1, NOW() - INTERVAL '8 hours',
+                 NOW() - INTERVAL '4 hours', NOW() - INTERVAL '1 hour')
+         RETURNING id`,
+        [batchId],
+      );
+      const expiredAttester = await recordHandoverSql(
+        db,
+        batchId,
+        stallId,
+        [
+          { stallOrderId: a1, deliveredBundles: 3 },
+          { stallOrderId: c1, deliveredBundles: 2 },
+        ],
+        'PAID_CASH',
+        { attestedBy: expired.rows[0].id },
+      );
+      expect(expiredAttester.message).toContain('has expired');
+
       const first = await recordHandover(
         db,
         batchId,
@@ -217,6 +255,7 @@ describe('Stall handover', () => {
         { attestedBy: sessionId },
       );
       expect(first.created).toBe(true);
+      expect(first.outbound_message_id).not.toBeNull();
 
       const orders = await db.query<{
         sku_code: string;
@@ -347,7 +386,43 @@ describe('Stall handover', () => {
         'PAID_CASH',
         { attestedBy: sessionId },
       );
-      expect(retry).toEqual({ handover_id: handover.id, created: false });
+      expect(retry).toEqual({
+        handover_id: handover.id,
+        outbound_message_id: handover.outbound_message_id,
+        created: false,
+      });
+
+      const retryWithoutSession = await recordHandover(
+        db,
+        batchId,
+        stallId,
+        [
+          { stallOrderId: a1, deliveredBundles: 3 },
+          { stallOrderId: c1, deliveredBundles: 2 },
+        ],
+        'PAID_CASH',
+      );
+      expect(retryWithoutSession).toEqual({
+        handover_id: handover.id,
+        outbound_message_id: handover.outbound_message_id,
+        created: false,
+      });
+
+      const otherSession = await createRunnerSession(db, batchId);
+      const changedAttester = await recordHandoverSql(
+        db,
+        batchId,
+        stallId,
+        [
+          { stallOrderId: a1, deliveredBundles: 3 },
+          { stallOrderId: c1, deliveredBundles: 2 },
+        ],
+        'PAID_CASH',
+        { attestedBy: otherSession },
+      );
+      expect(changedAttester.message).toContain(
+        'already attested by a different Runner session',
+      );
 
       const counts = (await db.query<{ movements: string; messages: string }>(
         `SELECT (SELECT COUNT(*) FROM stock_movements

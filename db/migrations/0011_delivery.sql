@@ -79,7 +79,7 @@ CREATE OR REPLACE FUNCTION fn_record_stall_handover(
   p_payment_proof_url TEXT DEFAULT NULL,
   p_attested_by      UUID DEFAULT NULL,
   p_handed_at        TIMESTAMPTZ DEFAULT NOW()
-) RETURNS TABLE (handover_id UUID, created BOOLEAN)
+) RETURNS TABLE (handover_id UUID, outbound_message_id UUID, created BOOLEAN)
 LANGUAGE plpgsql AS $$
 DECLARE
   v_batch            RECORD;
@@ -133,16 +133,6 @@ BEGIN
   IF v_payment_status = 'PAID_DUITNOW'
      AND (p_payment_reference IS NULL OR p_payment_proof_url IS NULL) THEN
     RAISE EXCEPTION 'PAID_DUITNOW requires both a payment reference and a proof link'
-      USING ERRCODE = 'check_violation';
-  END IF;
-
-  IF p_attested_by IS NOT NULL AND NOT EXISTS (
-    SELECT 1
-      FROM runner_sessions rs
-     WHERE rs.id = p_attested_by
-       AND rs.route_batch_id = p_route_batch_id
-  ) THEN
-    RAISE EXCEPTION 'the attesting Runner session is not assigned to this Route Batch'
       USING ERRCODE = 'check_violation';
   END IF;
 
@@ -248,10 +238,42 @@ BEGIN
         USING ERRCODE = 'check_violation';
     END IF;
 
+    IF p_attested_by IS NOT NULL
+       AND v_existing.attested_by IS DISTINCT FROM p_attested_by THEN
+      RAISE EXCEPTION 'this handover was already attested by a different Runner session'
+        USING ERRCODE = 'check_violation';
+    END IF;
+
     handover_id := v_existing_id;
+    outbound_message_id := v_existing.outbound_message_id;
     created := FALSE;
     RETURN NEXT;
     RETURN;
+  END IF;
+
+  IF p_attested_by IS NULL THEN
+    RAISE EXCEPTION 'a handover needs the attesting Runner session'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+      FROM runner_sessions rs
+     WHERE rs.id = p_attested_by
+       AND rs.route_batch_id = p_route_batch_id
+  ) THEN
+    RAISE EXCEPTION 'the attesting Runner session is not assigned to this Route Batch'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+      FROM runner_sessions rs
+     WHERE rs.id = p_attested_by
+       AND rs.expires_at > clock_timestamp()
+  ) THEN
+    RAISE EXCEPTION 'the attesting Runner session has expired'
+      USING ERRCODE = 'check_violation';
   END IF;
 
   -- ── First handover: the goods must be on the Vehicle ───────────────────
@@ -282,6 +304,11 @@ BEGIN
      ORDER BY o.sku_code
   LOOP
     IF v_line.delivered_bundles > 0 THEN
+      -- A stable lock per SKU and Vehicle, so two handovers cannot both read
+      -- the same balance before either posts.
+      PERFORM pg_advisory_xact_lock(
+        hashtext(v_line.sku_code || ':' || v_batch.vehicle_id::text));
+
       PERFORM 1
         FROM stock_movements m
        WHERE m.sku_code = v_line.sku_code
@@ -435,6 +462,7 @@ $receipt$,
   END IF;
 
   handover_id := v_handover_id;
+  outbound_message_id := v_outbound_id;
   created := TRUE;
   RETURN NEXT;
   RETURN;

@@ -40,6 +40,39 @@ export async function pendingMessages(
 }
 
 /**
+ * Send one still-pending row through the port and record the provider result
+ * on that row. A failure leaves the same row FAILED, so a retry updates it
+ * instead of creating a second message.
+ */
+async function deliverOne(
+  db: Queryable,
+  message: PendingMessage,
+  port: MessagingPort,
+): Promise<'sent' | 'failed'> {
+  let providerMessageId: string;
+  try {
+    const result = await port.send({
+      id: message.id,
+      toPhone: message.to_phone,
+      body: message.body,
+    });
+    providerMessageId = result.providerMessageId;
+  } catch (error) {
+    await db.query('SELECT fn_mark_outbound_failed($1, $2)', [
+      message.id,
+      failureText(error),
+    ]);
+    return 'failed';
+  }
+
+  await db.query('SELECT fn_mark_outbound_sent($1, $2)', [
+    message.id,
+    providerMessageId,
+  ]);
+  return 'sent';
+}
+
+/**
  * Send every still-pending row through the port and record the provider
  * result on that row. A failure leaves the same row FAILED, so a retry
  * updates it instead of creating a second message.
@@ -54,31 +87,28 @@ export async function deliverPendingMessages(
   let failed = 0;
 
   for (const message of pending) {
-    let providerMessageId: string;
-    try {
-      const result = await port.send({
-        id: message.id,
-        toPhone: message.to_phone,
-        body: message.body,
-      });
-      providerMessageId = result.providerMessageId;
-    } catch (error) {
-      await db.query('SELECT fn_mark_outbound_failed($1, $2)', [
-        message.id,
-        failureText(error),
-      ]);
-      failed += 1;
-      continue;
-    }
-
-    await db.query('SELECT fn_mark_outbound_sent($1, $2)', [
-      message.id,
-      providerMessageId,
-    ]);
-    sent += 1;
+    if ((await deliverOne(db, message, port)) === 'sent') sent += 1;
+    else failed += 1;
   }
 
   return { sent, failed };
+}
+
+/** Send exactly one queued or failed row; a sent or missing row is a no-op. */
+export async function deliverOutboundMessage(
+  db: Queryable,
+  messageId: string,
+  port: MessagingPort,
+): Promise<'sent' | 'failed' | 'missing'> {
+  const { rows } = await db.query<PendingMessage>(
+    `SELECT id, to_phone, body, status
+       FROM outbound_messages
+      WHERE id = $1`,
+    [messageId],
+  );
+  const message = rows[0];
+  if (!message || message.status === 'SENT') return 'missing';
+  return deliverOne(db, message, port);
 }
 
 export async function broadcastBatch(

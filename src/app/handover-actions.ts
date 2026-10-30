@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { deliverPendingMessages } from '@/lib/broadcast';
+import { deliverOutboundMessage } from '@/lib/broadcast';
 import { pool } from '@/lib/db';
 import { loadStallPreorderLines, recordStallHandover } from '@/lib/handover';
 import { createMessagingPort } from '@/lib/messaging';
@@ -60,12 +60,21 @@ export async function confirmHandover(formData: FormData): Promise<void> {
     });
     created = result.created;
 
-    // The handover and its receipt are already committed. A send failure
-    // leaves the queued row for the message log to retry.
-    try {
-      await deliverPendingMessages(pool, routeBatchId, createMessagingPort());
-    } catch (caught) {
-      sendError = failure(caught);
+    // The handover and its receipt are already committed. Send only this
+    // handover's receipt; a failure leaves that row for the receipt button.
+    if (result.outboundMessageId) {
+      try {
+        const outcome = await deliverOutboundMessage(
+          pool,
+          result.outboundMessageId,
+          createMessagingPort(),
+        );
+        if (outcome === 'failed') {
+          sendError = 'the provider refused it; retry from the Stall card.';
+        }
+      } catch (caught) {
+        sendError = failure(caught);
+      }
     }
   } catch (caught) {
     error = failure(caught);
@@ -79,4 +88,20 @@ export async function confirmHandover(formData: FormData): Promise<void> {
   });
   if (sendError) params.set('handoverSendError', sendError);
   redirect(`/?${params.toString()}`);
+}
+
+export async function sendHandoverReceipt(formData: FormData): Promise<void> {
+  let error: string | null = null;
+  let outcome: 'sent' | 'failed' | 'missing' = 'missing';
+  try {
+    const messageId = field(formData, 'messageId');
+    if (!messageId) throw new Error('Missing receipt message.');
+    outcome = await deliverOutboundMessage(pool, messageId, createMessagingPort());
+  } catch (caught) {
+    error = failure(caught);
+  }
+
+  if (error) redirect(`/?receiptError=${encodeURIComponent(error)}`);
+  revalidatePath('/');
+  redirect(`/?notice=receipt&receipt=${outcome}`);
 }

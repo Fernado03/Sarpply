@@ -289,6 +289,12 @@ button.primary {
   padding: 10px 16px;
 }
 
+.handover-total {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
 .draft {
   display: grid;
   gap: 12px;
