@@ -96,7 +96,15 @@ async function installHistoricalA1Prices(db: Client): Promise<void> {
   await db.query(
     `INSERT INTO wholesaler_prices
        (wholesaler_id, sku_code, carton_cost, valid_from, valid_to, is_primary)
-     SELECT w.id, 'A1', 150.00, DATE '2027-02-01', DATE '2027-06-30', TRUE
+     SELECT w.id, 'A1', 150.00, DATE '2027-02-01', DATE '2027-06-30', FALSE
+     FROM wholesalers w WHERE w.name = 'Pending Packaging Supplies'`,
+  );
+  // A competing primary quote in the same window: the Pool Price names the
+  // 150.00 row as its cost basis, so that is the row Cutoff must snapshot.
+  await db.query(
+    `INSERT INTO wholesaler_prices
+       (wholesaler_id, sku_code, carton_cost, valid_from, valid_to, is_primary)
+     SELECT w.id, 'A1', 155.00, DATE '2027-02-01', DATE '2027-06-30', TRUE
      FROM wholesalers w WHERE w.name = 'Pending Packaging Supplies'`,
   );
   await db.query(
@@ -115,7 +123,9 @@ async function installHistoricalA1Prices(db: Client): Promise<void> {
        (sku_code, wholesaler_price_id, pool_bundle_price, valid_from, valid_to)
      SELECT 'A1', wp.id, 16.50, DATE '2027-02-01', DATE '2027-06-30'
      FROM wholesaler_prices wp
-     WHERE wp.sku_code = 'A1' AND wp.valid_from = DATE '2027-02-01'`,
+     WHERE wp.sku_code = 'A1'
+       AND wp.valid_from = DATE '2027-02-01'
+       AND wp.carton_cost = 150.00`,
   );
   await db.query(
     `INSERT INTO pool_prices
@@ -324,6 +334,43 @@ describe('Cutoff freezes prices and orders', () => {
         'S08',
         'S09',
       ]);
+    });
+  });
+
+  it('refuses a Wholesaler PO inside the 30-minute gap after Cutoff', async () => {
+    await withTransaction(async (db) => {
+      const batchId = await createBatch(db, '2027-08-13', '2027-08-12T12:00:00+08');
+      await freeze(db, batchId, '2027-08-12T12:01:00+08');
+
+      const [opensAt] = (
+        await db.query<{ exact: boolean }>(
+          `SELECT fn_po_not_before($1) = TIMESTAMPTZ '2027-08-12 12:30:00+08' AS exact`,
+          [batchId],
+        )
+      ).rows;
+      expect(opensAt.exact).toBe(true);
+
+      const [wholesaler] = (
+        await db.query<{ id: string }>(
+          "SELECT id FROM wholesalers WHERE name = 'Pending Packaging Supplies'",
+        )
+      ).rows;
+
+      const early = await expectRejectedIn(
+        db,
+        `INSERT INTO wholesaler_pos (route_batch_id, wholesaler_id, submitted_at)
+         VALUES ($1, $2, TIMESTAMPTZ '2027-08-12 12:29:00+08')`,
+        [batchId, wholesaler.id],
+      );
+      expect(early.message).toContain('may not be submitted before');
+
+      const accepted = await db.query(
+        `INSERT INTO wholesaler_pos (route_batch_id, wholesaler_id, submitted_at)
+         VALUES ($1, $2, TIMESTAMPTZ '2027-08-12 12:30:00+08')
+         RETURNING id`,
+        [batchId, wholesaler.id],
+      );
+      expect(accepted.rowCount).toBe(1);
     });
   });
 

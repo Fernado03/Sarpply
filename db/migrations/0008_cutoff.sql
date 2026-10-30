@@ -50,28 +50,26 @@ BEGIN
 
   v_cutoff_date := (v_batch.cutoff_at AT TIME ZONE 'Asia/Kuching')::DATE;
 
+  -- The Pool Price names the Wholesaler price it was quoted against
+  -- (ADR-0008); snapshot that pair, and only while both windows contain the
+  -- Cutoff instant. An independent supplier lookup could pair a sell price
+  -- with a cost it was never quoted against.
   INSERT INTO route_batch_prices
     (route_batch_id, sku_code, wholesaler_price_id,
      locked_carton_cost, locked_pool_bundle_price)
   SELECT p_route_batch_id, pp.sku_code, wp.id, wp.carton_cost, pp.pool_bundle_price
   FROM (
     SELECT DISTINCT ON (pool.sku_code)
-           pool.sku_code, pool.pool_bundle_price
+           pool.sku_code, pool.pool_bundle_price, pool.wholesaler_price_id
     FROM pool_prices pool
     WHERE pool.valid_from <= v_cutoff_date
       AND (pool.valid_to IS NULL OR pool.valid_to >= v_cutoff_date)
     ORDER BY pool.sku_code, pool.valid_from DESC, pool.id
   ) pp
-  JOIN LATERAL (
-    SELECT price.id, price.carton_cost
-    FROM wholesaler_prices price
-    WHERE price.sku_code = pp.sku_code
-      AND price.valid_from <= v_cutoff_date
-      AND (price.valid_to IS NULL OR price.valid_to >= v_cutoff_date)
-    ORDER BY price.is_primary DESC, price.valid_from DESC, price.id
-    LIMIT 1
-  ) wp ON TRUE
+  JOIN wholesaler_prices wp ON wp.id = pp.wholesaler_price_id
   JOIN skus sk ON sk.sku_code = pp.sku_code AND sk.is_active
+  WHERE wp.valid_from <= v_cutoff_date
+    AND (wp.valid_to IS NULL OR wp.valid_to >= v_cutoff_date)
   ON CONFLICT (route_batch_id, sku_code) DO NOTHING;
   GET DIAGNOSTICS v_inserted = ROW_COUNT;
 
@@ -193,6 +191,45 @@ CREATE TRIGGER stall_orders_no_frozen_update
 CREATE TRIGGER stall_orders_no_frozen_delete
   BEFORE DELETE ON stall_orders
   FOR EACH ROW EXECUTE FUNCTION reject_frozen_preorder_mutation();
+
+-- ─── The Cutoff-to-PO gap is a database rule, not a habit ────────────────
+-- The dispatcher may fire up to 15 minutes late, so the PO window opens at
+-- least 30 minutes after Cutoff (ADR-0005).
+CREATE OR REPLACE FUNCTION fn_po_not_before(
+  p_route_batch_id UUID
+) RETURNS TIMESTAMPTZ LANGUAGE sql STABLE AS $$
+  SELECT b.cutoff_at + make_interval(mins => dp.cutoff_to_po_minutes)
+  FROM route_batches b
+  CROSS JOIN dispatch_policy dp
+  WHERE b.id = p_route_batch_id;
+$$;
+
+CREATE OR REPLACE FUNCTION reject_early_po_submission()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE
+  v_not_before TIMESTAMPTZ;
+BEGIN
+  IF NEW.submitted_at IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  v_not_before := fn_po_not_before(NEW.route_batch_id);
+  IF v_not_before IS NULL THEN
+    RAISE EXCEPTION 'unknown Route Batch %', NEW.route_batch_id
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+  IF NEW.submitted_at < v_not_before THEN
+    RAISE EXCEPTION 'Wholesaler PO may not be submitted before %', v_not_before
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER wholesaler_pos_gap_guard
+  BEFORE INSERT OR UPDATE ON wholesaler_pos
+  FOR EACH ROW EXECUTE FUNCTION reject_early_po_submission();
 
 -- ─── Who did not order before the book locked ─────────────────────────────
 CREATE OR REPLACE VIEW v_batch_missing_preorders AS
