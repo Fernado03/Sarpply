@@ -11,12 +11,12 @@ Legend: `✅` done · `👉` current · `⬜` not started · `⏭` not applicabl
 ## Current position
 
 ```text
-✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅; next #4/#5/#6) → ⬜ code-review → ⬜ pr → ⬜ retro
+✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅, #4 ✅, #5 ✅; next #6/#7) → ⬜ code-review → ⬜ pr → ⬜ retro
 ```
 
-- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a), ticket #4 text intake (§4b).
-- **Now:** `/implement #5` (Cutoff) — #5 and #6 are both unblocked; #7 unlocks once #5 lands.
-- **After that:** #7, then the rest of the graph; `/pr`, `/retro` at the end.
+- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a), ticket #4 text intake (§4b), ticket #5 Cutoff (§4c).
+- **Now:** `/implement #6` (WhatsApp transport) or `/implement #7` (Purchase) — both are unblocked. #12 unlocks when #6 lands; #8 needs #6 and #7.
+- **After that:** the rest of the graph; `/pr`, `/retro` at the end.
 
 ---
 
@@ -191,6 +191,22 @@ Per-ticket loop:
 - **Review:** Standards — 0 hard violations; 2 judgement calls (draft line shape deduplicated with `Pick`, vertical-slice file spread accepted). Spec — 3 findings: the Golden 6 set pinned and multi-SKU quantities paired, both fixed in `41ccad7`; the residual-word blank line was not actioned because a segment with a recognised SKU is not a parse gap, `rawText` retains the full segment, and an over-eager blank would block commit with no dismiss affordance.
 - **Next:** `/implement #5` (Cutoff) or #6 (WhatsApp); #7 needs #5.
 
+### ✅ 4c. Ticket #5 — Cutoff, 2026-10-30
+
+- **Closed:** [#5](https://github.com/Fernado03/Sarpply/issues/5) on 2026-10-30 with the evidence comment.
+- **Commits:** `5d4fe41` (implementation), `ff8ff1f` (review fixes). Branch `main`.
+- **Database:** `db/migrations/0008_cutoff.sql` adds `fn_freeze_prices`, `fn_fire_due_cutoffs`, `dispatch_policy`, `fn_po_not_before`, the Preorder freeze triggers, the early-PO guard and `v_batch_missing_preorders`.
+  - Cutoff refuses a batch that is not due (`p_now < cutoff_at`) or not open.
+  - The snapshot takes the Pool Price whose validity window contains the cutoff instant and the Wholesaler price that Pool Price was quoted against (ADR-0008), not the open row.
+  - The batch row lock plus `UNIQUE (route_batch_id, transition_type)` make a retry a no-op; `fired_at` is recorded.
+  - Preorder `ordered_bundles` and `unit_price_locked` reject UPDATE and DELETE once the batch leaves `OPEN_FOR_ORDERS`; the snapshot was already append-only (0003).
+  - `fn_po_not_before` opens the PO window at cutoff + `cutoff_to_po_minutes`; the trigger refuses an earlier `submitted_at`. `dispatch_policy` checks poll ≤ 15 min and gap ≥ 30 min.
+- **Dispatcher:** `scripts/dispatch.ts` (`npm run dispatch`, `--once` for a single poll) reads the interval from `dispatch_policy` and fires due Cutoffs. The console runs a catch-up poll on load, so a missed tick cannot leave a stale open batch.
+- **Console:** shows batch state, cutoff and fired-at time, frozen carton/pool price per SKU, and the Stalls with no Preorder after Cutoff. Frozen prices render as a phone-first list (360 px: `scrollWidth` 360).
+- **Evidence:** `npm test` 42 passed (8 cutoff, 34 existing) against real PostgreSQL 16; `npm run typecheck` clean; `npm run build` not rerun (no route change); `npm run db:reset` clean. Dispatcher smoke: seed cutoff moved into the past, `npm run dispatch -- --once` fired once → `CLOSED_AT_CUTOFF`, 6 snapshot rows, one `CUTOFF_FIRED`. Console catch-up smoke: after reset, cutoff moved into the past, page load closed the batch and wrote exactly one transition and 6 snapshot rows. Browser at 390 px and 360 px showed `CLOSED AT CUTOFF`, six frozen prices, and all nine Stalls with no Preorder.
+- **Review:** Standards — 0 hard violations; 3 judgement calls (cross-file cutoff split, singleton boolean key, test-helper overlap), none actioned. Spec — 2 findings: the PO gap was stored but unused, and the Pool/Wholesaler snapshot paired independent rows. Both fixed in `ff8ff1f`: `fn_po_not_before` + trigger with a +29/−+30 test, and the snapshot now follows `pool_prices.wholesaler_price_id` (a competing primary quote test pins it).
+- **Next:** `/clear`, then `/implement #6` (WhatsApp) or #7 (Purchase) — both unblocked. #12 unlocks once #6 lands; #8 needs #6 and #7.
+
 ## ⬜ 5. Review — `/code-review`
 
 - Runs inside `/implement`; can also be typed on its own.
@@ -309,3 +325,5 @@ Never compact mid-phase. Every move except Continue turns a primary source into 
 | 2026-10-30 | Implement #3 | `/implement 3` | Walking skeleton landed; issue #3 closed | `95fe0e8`, `775b016`; 14 tests at the database seam |
 | 2026-10-30 | Code review #3 | `/code-review d594a85` | Standards 2 judgement calls; Spec 2 findings (identity, valuation in app code); both Spec findings fixed | `775b016` |
 | 2026-10-30 | Implement #4 | `/implement 4` | Text intake landed; issue #4 closed | `41ccad7`; 33 tests at the parser and database seams |
+| 2026-10-30 | Implement #5 | `/implement 5` | Cutoff landed; issue #5 closed | `5d4fe41`, `ff8ff1f`; 42 tests at the database seam |
+| 2026-10-30 | Code review #5 | `/code-review a186064` | Standards 0 hard violations, 3 judgement calls; Spec 2 findings (PO gap unused, price pairing); both fixed | `ff8ff1f` |
