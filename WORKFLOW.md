@@ -2,7 +2,7 @@
 
 Human-facing checklist for the Matt Pocock skill flow. The issue tracker owns the work; this file owns **which step we are on**.
 
-Last updated: 2026-10-29
+Last updated: 2026-10-30
 
 Legend: `✅` done · `👉` current · `⬜` not started · `⏭` not applicable
 
@@ -11,12 +11,12 @@ Legend: `✅` done · `👉` current · `⬜` not started · `⏭` not applicabl
 ## Current position
 
 ```text
-✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement → ⬜ code-review → ⬜ pr → ⬜ retro
+✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅; next #4/#5/#6) → ⬜ code-review → ⬜ pr → ⬜ retro
 ```
 
-- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b).
-- **Now:** `/implement #3` — the only unblocked ticket.
-- **After that:** `/clear`, then the next frontier ticket; then `/code-review`, `/pr`, `/retro`.
+- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a).
+- **Now:** `/clear`, then `/implement #4` — or #5/#6. All three are unblocked; #3 closed 2026-10-30.
+- **After that:** #7 once #4 and #5 are done; then the rest of the graph; `/pr`, `/retro` at the end.
 
 ---
 
@@ -167,6 +167,19 @@ Per-ticket loop:
 - [ ] Commit; close the ticket the way the tracker closes work.
 - [ ] Update this file's arrow.
 
+### ✅ 4a. Ticket #3 — walking skeleton, 2026-10-30
+
+- **Closed:** [#3](https://github.com/Fernado03/Sarpply/issues/3) on 2026-10-30 with the evidence comment.
+- **Commits:** `95fe0e8` (implementation), `775b016` (review fixes). Branch `main`.
+- **Stack chosen in this ticket:** Next.js 16 + TypeScript console, plain SQL migrations, `pg`, Vitest, embedded PostgreSQL 16 by default; `DATABASE_URL` / `TEST_DATABASE_URL` override for an existing server (required on an elevated Windows shell, where PostgreSQL refuses to start).
+- **Schema:** Pillar 9 tables plus `stock_movements.unit_cost_myr`, order source channel, voice draft/lines/events, provider-keyed inbound/outbound messages, batch transition log, correction audit, retention log, runner sessions, per-batch Vehicle and `stalls.stall_code`. RLS stays deferred to #13.
+- **Valuation:** moving weighted-average cost, recorded on every movement by `fn_post_stock_movement` under a row lock; documented as `docs/adr/0018-buffer-stock-valued-at-weighted-average-cost.md`.
+- **Seed and fixtures:** Route, nine Stalls, Golden 6, Myvi, one open B01-style batch (cutoff 2026-11-04 12:00 MYT, one Sortie, RM 42.50, Vehicle), plus B01/B02 orders, POs, deliveries and price snapshots read from `Sarpply_Phase_1_Tracking_Sheet_Master.xlsx`.
+- **Evidence:** `npm run db:reset` → 3 Route Batches, 10 Stalls, 6 SKUs, 31 Stall Orders; `npm test` → 14 passed against real PostgreSQL 16; `npm run typecheck` clean; `npm run build` clean; console checked in Chromium at 360 px (scrollWidth 360) showing `OPEN FOR ORDERS` and `Collect Preorders until Cutoff`.
+- **Numbers:** B01 13 cartons / 18 boxes / 901.5 L / Forecast GP 173.00 / Realized GP 167.00 / buffer 183.00; B02 Realized GP 187.50 / buffer 37.50; identity residual 0.00 on both; Net Cash −58.50 and +290.50.
+- **Review:** Standards — 2 judgement calls (duplicated `CEIL` expression fixed in `0006_aggregation_cleanup.sql`; primitive cost value left). Spec — 2 findings (identity/Net Cash not published; valuation in application code), both fixed in `775b016`.
+- **Next:** `/clear`, then `/implement #4` (text intake), or #5/#6 — all now unblocked.
+
 ## ⬜ 5. Review — `/code-review`
 
 - Runs inside `/implement`; can also be typed on its own.
@@ -282,3 +295,5 @@ Never compact mid-phase. Every move except Continue turns a primary source into 
 | 2026-10-29 | Tickets | `/to-tickets 2` | 15 sub-issues published with native blocking edges; parent #2 unchanged | Issues [#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17); frontier #3 |
 | 2026-10-29 | Ticket review | `reviewer` subagent (read-only) | NEEDS CHANGES; graph sound, contracts incomplete; 5 blocking, 5 major, 4 minor findings | `WORKFLOW.md` §3a; `history://TicketReview` |
 | 2026-10-29 | Ticket remediation | Applied in place, #3–#17 | All 14 findings applied to ticket bodies; #12 blocker changed from #11 to #6; graph reverified | `WORKFLOW.md` §3b; issues #3–#17 |
+| 2026-10-30 | Implement #3 | `/implement 3` | Walking skeleton landed; issue #3 closed | `95fe0e8`, `775b016`; 14 tests at the database seam |
+| 2026-10-30 | Code review #3 | `/code-review d594a85` | Standards 2 judgement calls; Spec 2 findings (identity, valuation in app code); both Spec findings fixed | `775b016` |
