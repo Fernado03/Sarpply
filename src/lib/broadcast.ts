@@ -1,13 +1,5 @@
-import type { QueryResultRow } from 'pg';
-import { pool } from './db';
+import type { Queryable } from './db';
 import type { MessagingPort } from './messaging/types';
-
-export interface Queryable {
-  query<T extends QueryResultRow = QueryResultRow>(
-    text: string,
-    values?: unknown[],
-  ): Promise<{ rows: T[] }>;
-}
 
 interface PendingMessage {
   id: string;
@@ -97,18 +89,4 @@ export async function broadcastBatch(
   const queued = await queueBroadcast(db, routeBatchId);
   const delivery = await deliverPendingMessages(db, routeBatchId, port);
   return { queued, ...delivery };
-}
-
-export function appBroadcast(
-  routeBatchId: string,
-  port: MessagingPort,
-): Promise<BroadcastResult> {
-  return broadcastBatch(pool, routeBatchId, port);
-}
-
-export function appRetry(
-  routeBatchId: string,
-  port: MessagingPort,
-): Promise<Omit<BroadcastResult, 'queued'>> {
-  return deliverPendingMessages(pool, routeBatchId, port);
 }

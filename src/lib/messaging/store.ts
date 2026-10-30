@@ -1,13 +1,5 @@
-import type { QueryResultRow } from 'pg';
-import { pool } from '../db';
+import type { Queryable } from '../db';
 import type { InboundMessageRecord } from './webhook-payload';
-
-export interface Queryable {
-  query<T extends QueryResultRow = QueryResultRow>(
-    text: string,
-    values?: unknown[],
-  ): Promise<{ rows: T[] }>;
-}
 
 export interface StoredInboundMessage {
   id: string;
@@ -36,8 +28,4 @@ export async function storeInboundMessage(
     ],
   );
   return rows[0];
-}
-
-export function appStore(message: InboundMessageRecord): Promise<StoredInboundMessage> {
-  return storeInboundMessage(pool, message);
 }

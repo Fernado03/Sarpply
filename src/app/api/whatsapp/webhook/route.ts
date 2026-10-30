@@ -1,4 +1,5 @@
-import { appStore } from '@/lib/messaging/store';
+import { pool } from '@/lib/db';
+import { storeInboundMessage } from '@/lib/messaging/store';
 import { createWhatsAppWebhook } from '@/lib/messaging/webhook';
 
 export const runtime = 'nodejs';
@@ -6,7 +7,7 @@ export const runtime = 'nodejs';
 const handlers = createWhatsAppWebhook({
   appSecret: process.env.WHATSAPP_APP_SECRET ?? null,
   verifyToken: process.env.WHATSAPP_VERIFY_TOKEN ?? null,
-  store: appStore,
+  store: (message) => storeInboundMessage(pool, message),
 });
 
 export async function GET(request: Request): Promise<Response> {

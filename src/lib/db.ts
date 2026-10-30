@@ -1,6 +1,14 @@
+import type { QueryResultRow } from 'pg';
 import { Pool } from 'pg';
 
 const globalForDatabase = globalThis as unknown as { sarpplyPool?: Pool };
+
+export interface Queryable {
+  query<T extends QueryResultRow = QueryResultRow>(
+    text: string,
+    values?: unknown[],
+  ): Promise<{ rows: T[] }>;
+}
 
 export const pool =
   globalForDatabase.sarpplyPool ??

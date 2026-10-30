@@ -8,7 +8,8 @@ import {
   draftLineNumbers,
   saveDraftLines,
 } from '@/lib/intake';
-import { appBroadcast, appRetry } from '@/lib/broadcast';
+import { broadcastBatch, deliverPendingMessages } from '@/lib/broadcast';
+import { pool } from '@/lib/db';
 import { createMessagingPort } from '@/lib/messaging';
 import { parseOrderText } from '@/lib/order-text';
 
@@ -75,38 +76,37 @@ export async function commitDraft(formData: FormData): Promise<void> {
   redirect('/?notice=committed');
 }
 
-export async function sendBroadcast(formData: FormData): Promise<void> {
+async function runMessageAction(
+  formData: FormData,
+  deliver: (batchId: string) => Promise<{ sent: number; failed: number }>,
+  notice: 'broadcast' | 'retried',
+): Promise<void> {
   let error: string | null = null;
-  let sent = 0;
-  let failed = 0;
+  let result = { sent: 0, failed: 0 };
   try {
     const batchId = field(formData, 'batchId');
     if (!batchId) throw new Error('Missing Route Batch.');
-    const result = await appBroadcast(batchId, createMessagingPort());
-    sent = result.sent;
-    failed = result.failed;
+    result = await deliver(batchId);
   } catch (caught) {
     error = failure(caught);
   }
   if (error) redirect(`/?intakeError=${encodeURIComponent(error)}`);
   revalidatePath('/');
-  redirect(`/?notice=broadcast&sent=${sent}&failed=${failed}`);
+  redirect(`/?notice=${notice}&sent=${result.sent}&failed=${result.failed}`);
+}
+
+export async function sendBroadcast(formData: FormData): Promise<void> {
+  return runMessageAction(
+    formData,
+    (batchId) => broadcastBatch(pool, batchId, createMessagingPort()),
+    'broadcast',
+  );
 }
 
 export async function retryMessages(formData: FormData): Promise<void> {
-  let error: string | null = null;
-  let sent = 0;
-  let failed = 0;
-  try {
-    const batchId = field(formData, 'batchId');
-    if (!batchId) throw new Error('Missing Route Batch.');
-    const result = await appRetry(batchId, createMessagingPort());
-    sent = result.sent;
-    failed = result.failed;
-  } catch (caught) {
-    error = failure(caught);
-  }
-  if (error) redirect(`/?intakeError=${encodeURIComponent(error)}`);
-  revalidatePath('/');
-  redirect(`/?notice=retried&sent=${sent}&failed=${failed}`);
+  return runMessageAction(
+    formData,
+    (batchId) => deliverPendingMessages(pool, batchId, createMessagingPort()),
+    'retried',
+  );
 }

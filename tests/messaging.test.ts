@@ -268,6 +268,8 @@ describe('Tuesday broadcast', () => {
         expect(message.status).toBe('QUEUED');
         expect(message.body.startsWith('📦 SARPPLY')).toBe(true);
         expect(message.body).toContain('SARPPLY: POOL BORONG MINGGU NI DAH BUKA');
+        expect(message.body).toContain('(Selasa, 12:00)');
+        expect(message.body).toContain('hari Rabu petang');
         expect(message.body).toContain('[A1] Bekas Tapau 22oz + Penutup Rata (10 bungkus)');
         expect(message.body).toContain('= RM 15.00');
         expect(message.body).toContain('= RM 13.50');

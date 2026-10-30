@@ -112,6 +112,10 @@ CREATE OR REPLACE FUNCTION fn_queue_broadcast(
 DECLARE
   v_batch        RECORD;
   v_today        DATE;
+  v_cutoff_local TIMESTAMPTZ;
+  v_close_day    TEXT;
+  v_delivery_day TEXT;
+  v_when         TEXT;
   v_prices       TEXT;
   v_active_count INT;
   v_priced_count INT;
@@ -134,6 +138,22 @@ BEGIN
   END IF;
 
   v_today := (NOW() AT TIME ZONE 'Asia/Kuching')::DATE;
+  v_cutoff_local := v_batch.cutoff_at AT TIME ZONE 'Asia/Kuching';
+
+  v_close_day := CASE EXTRACT(ISODOW FROM v_cutoff_local)::INT
+    WHEN 1 THEN 'Isnin' WHEN 2 THEN 'Selasa' WHEN 3 THEN 'Rabu'
+    WHEN 4 THEN 'Khamis' WHEN 5 THEN 'Jumaat' WHEN 6 THEN 'Sabtu'
+    ELSE 'Ahad' END;
+  v_delivery_day := CASE EXTRACT(ISODOW FROM v_batch.delivery_date)::INT
+    WHEN 1 THEN 'Isnin' WHEN 2 THEN 'Selasa' WHEN 3 THEN 'Rabu'
+    WHEN 4 THEN 'Khamis' WHEN 5 THEN 'Jumaat' WHEN 6 THEN 'Sabtu'
+    ELSE 'Ahad' END;
+  v_when := format(
+    '%s (%s, %s)',
+    CASE WHEN v_cutoff_local::DATE = v_today + 1 THEN 'esok' ELSE 'pada' END,
+    v_close_day,
+    to_char(v_cutoff_local, 'HH24:MI')
+  );
 
   SELECT COUNT(*) INTO v_active_count FROM skus WHERE is_active;
   SELECT COUNT(*) INTO v_priced_count
@@ -187,11 +207,10 @@ BEGIN
   v_body := btrim(format($script$
 📦 SARPPLY: POOL BORONG MINGGU NI DAH BUKA! 📦
 
-Hi Boss! Order berkumpulan minggu ni dibuka sekarang, tutup esok
-(Rabu, 12:00 tengah hari).
+Hi Boss! Order berkumpulan minggu ni dibuka sekarang, tutup %s.
 
 ✅ Harga karton — beli 1 bundle pun dapat harga borong
-✅ Hantar terus ke gerai hari Khamis petang, PERCUMA
+✅ Hantar terus ke gerai hari %s petang, PERCUMA
 ✅ Bayar cash atau scan DuitNow QR masa barang sampai saja
 ✅ Tak perlu bayar apa-apa hari ni
 
@@ -202,7 +221,7 @@ HARGA POOL MINGGU NI:
 Contoh: "A1 x 3, C1 x 2, E1 x 1"
 Atau hantar voice note — kami akan baca balik untuk confirm.
 🔒 Voice note disimpan 7 hari sahaja untuk semakan pesanan, lepas tu dipadam.
-$script$, v_prices), E' \t\n\r');
+$script$, v_when, v_delivery_day, v_prices), E' \t\n\r');
 
   INSERT INTO outbound_messages
     (to_phone, body, status, dedupe_key, route_batch_id, stall_id)

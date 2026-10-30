@@ -45,7 +45,9 @@ metadata only; nothing transcribes audio or creates an order.
 
 The console's **Queue and send Tuesday broadcast** button queues Script B with the Pool Prices in
 force and the seven-day voice-note line, then sends every queued row. A failed row stays in the log
-as `FAILED`; **Retry failed** updates that same row, never a duplicate.
+as `FAILED`; **Retry failed** updates that same row, never a duplicate. Delivery is at-least-once:
+the Cloud API has no idempotency key for a text send, so a lost acknowledgement can deliver the
+same text twice even though the message row stays single.
 
 `db:reset` stops its embedded server when it finishes, so `db:dev` keeps one running for the app.
 Alternatively point `DATABASE_URL` at an existing PostgreSQL 16 server (see `.env.example`) and
