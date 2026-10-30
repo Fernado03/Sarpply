@@ -229,3 +229,100 @@ footer {
     font-size: 1.3rem;
   }
 }
+
+.notice {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.notice.error {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.intake-form {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.field select,
+.field textarea,
+.draft-line select,
+.draft-line input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  padding: 10px 12px;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+button.primary {
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--bg);
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 16px;
+}
+
+.draft {
+  display: grid;
+  gap: 12px;
+}
+
+.draft-body {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
+
+.draft-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.draft-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 6rem;
+  gap: 8px;
+  align-items: center;
+}
+
+.draft-raw {
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 560px) {
+  .draft-line {
+    grid-template-columns: 1fr;
+  }
+}

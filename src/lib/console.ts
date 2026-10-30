@@ -11,6 +11,7 @@ export interface BatchView {
 }
 
 export interface StallView {
+  id: string;
   cluster: string;
   stallCode: string;
   stallNumber: string;
@@ -89,7 +90,8 @@ export async function loadConsole(): Promise<ConsoleView | null> {
   if (!batch) return null;
 
   const stallsResult = await pool.query<StallView>(
-    `SELECT c.name AS cluster,
+    `SELECT st.id,
+            c.name AS cluster,
             st.stall_code AS "stallCode",
             st.stall_number AS "stallNumber",
             st.stall_name AS "stallName",

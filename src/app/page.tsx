@@ -1,4 +1,6 @@
+import { commitDraft, saveTextDraft } from './actions';
 import { loadConsole, nextAction, statusLabel } from '@/lib/console';
+import { loadOpenDrafts } from '@/lib/intake';
 
 export const dynamic = 'force-dynamic';
 
@@ -6,8 +8,16 @@ function rm(value: string | null): string {
   return value === null ? '—' : `RM ${Number(value).toFixed(2)}`;
 }
 
-export default async function Page() {
+interface PageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function Page({ searchParams }: PageProps) {
+  const params = await searchParams;
   const view = await loadConsole();
+
+  const intakeError = typeof params.intakeError === 'string' ? params.intakeError : null;
+  const notice = typeof params.notice === 'string' ? params.notice : null;
 
   if (!view) {
     return (
@@ -25,11 +35,24 @@ export default async function Page() {
     clusters.set(stall.cluster, [...(clusters.get(stall.cluster) ?? []), stall]);
   }
   const open = batch.status === 'OPEN_FOR_ORDERS';
+  const drafts = await loadOpenDrafts(batch.id);
 
   return (
     <main>
       <p className="brand">Sarpply</p>
       <p className="route">{batch.routeName}</p>
+
+      {intakeError ? (
+        <p className="notice error" role="alert">
+          {intakeError}
+        </p>
+      ) : null}
+      {notice === 'saved' ? (
+        <p className="notice">Draft saved. Review the lines, then commit.</p>
+      ) : null}
+      {notice === 'committed' ? (
+        <p className="notice">Preorder committed to the batch.</p>
+      ) : null}
 
       <section className="card">
         <div className="card-head">
@@ -51,6 +74,89 @@ export default async function Page() {
             <dd>{batch.sortieCount}</dd>
           </div>
         </dl>
+      </section>
+
+      <section>
+        <h2>Order intake</h2>
+        {open ? (
+          <form action={saveTextDraft} className="card intake-form">
+            <input type="hidden" name="batchId" value={batch.id} />
+            <label className="field">
+              <span>Stall</span>
+              <select name="stallId" defaultValue="" required>
+                <option value="" disabled>
+                  Choose the Stall
+                </option>
+                {stalls.map((stall) => (
+                  <option key={stall.stallCode} value={stall.id}>
+                    {stall.stallCode} · {stall.stallName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Pasted WhatsApp reply</span>
+              <textarea
+                name="body"
+                rows={4}
+                required
+                placeholder={'A1 x 3, C1 2\n3 kotak B1'}
+              />
+            </label>
+            <button type="submit" className="primary">
+              Parse and save draft
+            </button>
+          </form>
+        ) : (
+          <p className="empty">Intake accepts Preorders only while the batch is open.</p>
+        )}
+
+        {drafts.length === 0 ? (
+          <p className="empty">No unconfirmed drafts.</p>
+        ) : (
+          drafts.map((draft) => (
+            <form key={draft.id} action={commitDraft} className="card draft">
+              <input type="hidden" name="draftId" value={draft.id} />
+              <div className="card-head">
+                <strong>
+                  {draft.stallCode} · {draft.stallName}
+                </strong>
+                <span className="stall-meta">Unconfirmed · {draft.createdAt}</span>
+              </div>
+              <p className="draft-body">{draft.body}</p>
+              <ul className="draft-lines">
+                {draft.lines.map((line) => (
+                  <li key={line.lineNo} className="draft-line">
+                    <span className="draft-raw">{line.rawText || '—'}</span>
+                    <select
+                      name={`sku-${line.lineNo}`}
+                      defaultValue={line.skuCode ?? ''}
+                      aria-label={`SKU for line ${line.lineNo}`}
+                    >
+                      <option value="">Unresolved</option>
+                      {catalogue.map((sku) => (
+                        <option key={sku.skuCode} value={sku.skuCode}>
+                          {sku.skuCode} · {sku.nameEn}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      name={`bundles-${line.lineNo}`}
+                      defaultValue={line.orderedBundles ?? ''}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="Bundles"
+                      aria-label={`Bundles for line ${line.lineNo}`}
+                    />
+                  </li>
+                ))}
+              </ul>
+              <button type="submit" className="primary">
+                Commit Preorder
+              </button>
+            </form>
+          ))
+        )}
       </section>
 
       {[...clusters.entries()].map(([cluster, clusterStalls]) => (
