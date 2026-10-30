@@ -14,9 +14,9 @@ Legend: `✅` done · `👉` current · `⬜` not started · `⏭` not applicabl
 ✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅; next #4/#5/#6) → ⬜ code-review → ⬜ pr → ⬜ retro
 ```
 
-- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a).
-- **Now:** `/clear`, then `/implement #4` — or #5/#6. All three are unblocked; #3 closed 2026-10-30.
-- **After that:** #7 once #4 and #5 are done; then the rest of the graph; `/pr`, `/retro` at the end.
+- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a), ticket #4 text intake (§4b).
+- **Now:** `/implement #5` (Cutoff) — #5 and #6 are both unblocked; #7 unlocks once #5 lands.
+- **After that:** #7, then the rest of the graph; `/pr`, `/retro` at the end.
 
 ---
 
@@ -180,6 +180,17 @@ Per-ticket loop:
 - **Review:** Standards — 2 judgement calls (duplicated `CEIL` expression fixed in `0006_aggregation_cleanup.sql`; primitive cost value left). Spec — 2 findings (identity/Net Cash not published; valuation in application code), both fixed in `775b016`.
 - **Next:** `/clear`, then `/implement #4` (text intake), or #5/#6 — all now unblocked.
 
+### ✅ 4b. Ticket #4 — text order intake, 2026-10-30
+
+- **Closed:** [#4](https://github.com/Fernado03/Sarpply/issues/4) on 2026-10-30 with the evidence comment.
+- **Commits:** `41ccad7` (implementation).
+- **Parser seam:** `src/lib/order-text.ts` is pure — no database, no network. It accepts exactly the Golden 6 (`GOLDEN_SIX_SKU_CODES`) and quantities of at least one; Malay, English and Chinese numerals, `x` and unit markers, mixed prose and multi-SKU segments (`A1 x 3 C1 2`) parse; a segment with no SKU or a conflicting quantity stays blank.
+- **Database:** `0007_text_order_intake.sql` adds `text_order_drafts`, `text_order_draft_lines`, `fn_create_text_draft`, `fn_update_text_draft_lines` and `fn_commit_text_draft`. Intake and commit refuse a closed batch or a passed Cutoff; commit writes `PREORDER` rows with source `TEXT` and the Pool Price in force at commit time, sums duplicate SKUs, and updates the Stall's Preorder while the batch is open.
+- **Console:** paste-and-parse form, persisted unconfirmed drafts with per-line SKU/quantity editing, and commit; `src/app/actions.ts`, `src/lib/intake.ts`, `src/app/page.tsx`, styles.
+- **Evidence:** `npm test` 33 passed (15 parser, 4 intake, 14 existing); `npm run typecheck` clean; `npm run build` clean. Browser smoke at 390 px and 360 px (scrollWidth 360 = clientWidth 360): `A1 x 3, 2 kotak C1, 五箱 D1` → A1 3, C1 2, D1 5; C1 edited to 4 before commit; S01 rows stored source `TEXT` at 15.00 / 13.50 / 21.00. An unresolved `the usual 2` line was refused with "every draft line needs an active SKU and a quantity before commit", then corrected and committed. `A1 x 3 C1 2` parsed to 3 and 2 without commas.
+- **Review:** Standards — 0 hard violations; 2 judgement calls (draft line shape deduplicated with `Pick`, vertical-slice file spread accepted). Spec — 3 findings: the Golden 6 set pinned and multi-SKU quantities paired, both fixed in `41ccad7`; the residual-word blank line was not actioned because a segment with a recognised SKU is not a parse gap, `rawText` retains the full segment, and an over-eager blank would block commit with no dismiss affordance.
+- **Next:** `/implement #5` (Cutoff) or #6 (WhatsApp); #7 needs #5.
+
 ## ⬜ 5. Review — `/code-review`
 
 - Runs inside `/implement`; can also be typed on its own.
@@ -297,3 +308,4 @@ Never compact mid-phase. Every move except Continue turns a primary source into 
 | 2026-10-29 | Ticket remediation | Applied in place, #3–#17 | All 14 findings applied to ticket bodies; #12 blocker changed from #11 to #6; graph reverified | `WORKFLOW.md` §3b; issues #3–#17 |
 | 2026-10-30 | Implement #3 | `/implement 3` | Walking skeleton landed; issue #3 closed | `95fe0e8`, `775b016`; 14 tests at the database seam |
 | 2026-10-30 | Code review #3 | `/code-review d594a85` | Standards 2 judgement calls; Spec 2 findings (identity, valuation in app code); both Spec findings fixed | `775b016` |
+| 2026-10-30 | Implement #4 | `/implement 4` | Text intake landed; issue #4 closed | `41ccad7`; 33 tests at the parser and database seams |
