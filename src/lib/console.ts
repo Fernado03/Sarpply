@@ -5,6 +5,7 @@ export interface BatchView {
   status: string;
   deliveryDate: string;
   cutoffAt: string;
+  cutoffFiredAt: string | null;
   routeName: string;
   vehicleLabel: string;
   sortieCount: number;
@@ -43,11 +44,27 @@ export interface CatalogueView {
   poolBundlePrice: string | null;
 }
 
+export interface FrozenPriceView {
+  skuCode: string;
+  nameEn: string;
+  bundleUnitName: string;
+  cartonCost: string;
+  poolBundlePrice: string;
+}
+
+export interface MissingStallView {
+  stallCode: string;
+  stallName: string;
+  cluster: string;
+}
+
 export interface ConsoleView {
   batch: BatchView;
   stalls: StallView[];
   orders: OrderView[];
   catalogue: CatalogueView[];
+  frozenPrices: FrozenPriceView[];
+  missingPreorders: MissingStallView[];
 }
 
 const NEXT_ACTION: Record<string, string> = {
@@ -69,11 +86,19 @@ export function statusLabel(status: string): string {
 }
 
 export async function loadConsole(): Promise<ConsoleView | null> {
+  // Cutoff is automatic. The dispatcher does this every 15 minutes; the
+  // console catch-up keeps the screen honest if the dispatcher was down.
+  await pool.query('SELECT fn_fire_due_cutoffs()');
+
   const batchResult = await pool.query<BatchView>(
     `SELECT b.id,
             b.status,
             b.delivery_date::text AS "deliveryDate",
             TO_CHAR(b.cutoff_at AT TIME ZONE 'Asia/Kuching', 'Dy DD Mon, HH24:MI') AS "cutoffAt",
+            (SELECT TO_CHAR(t.fired_at AT TIME ZONE 'Asia/Kuching', 'Dy DD Mon, HH24:MI')
+               FROM route_batch_transitions t
+              WHERE t.route_batch_id = b.id
+                AND t.transition_type = 'CUTOFF_FIRED') AS "cutoffFiredAt",
             r.name AS "routeName",
             v.label AS "vehicleLabel",
             b.sortie_count AS "sortieCount"
@@ -137,10 +162,35 @@ export async function loadConsole(): Promise<ConsoleView | null> {
      ORDER BY s.sku_code`,
   );
 
+  const frozenResult = await pool.query<FrozenPriceView>(
+    `SELECT rbp.sku_code AS "skuCode",
+            s.name_en AS "nameEn",
+            s.bundle_unit_name AS "bundleUnitName",
+            rbp.locked_carton_cost::text AS "cartonCost",
+            rbp.locked_pool_bundle_price::text AS "poolBundlePrice"
+     FROM route_batch_prices rbp
+     JOIN skus s ON s.sku_code = rbp.sku_code
+     WHERE rbp.route_batch_id = $1
+     ORDER BY rbp.sku_code`,
+    [batch.id],
+  );
+
+  const missingResult = await pool.query<MissingStallView>(
+    `SELECT stall_code AS "stallCode",
+            stall_name AS "stallName",
+            cluster_name AS cluster
+     FROM v_batch_missing_preorders
+     WHERE route_batch_id = $1
+     ORDER BY cluster_name, stall_code`,
+    [batch.id],
+  );
+
   return {
     batch,
     stalls: stallsResult.rows,
     orders: ordersResult.rows,
     catalogue: catalogueResult.rows,
+    frozenPrices: frozenResult.rows,
+    missingPreorders: missingResult.rows,
   };
 }

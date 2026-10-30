@@ -13,7 +13,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "db:reset": "tsx scripts/db.ts reset",
-    "db:dev": "tsx scripts/db.ts dev"
+    "db:dev": "tsx scripts/db.ts dev",
+    "dispatch": "tsx scripts/dispatch.ts"
   },
   "repository": {
     "type": "git",

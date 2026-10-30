@@ -29,7 +29,7 @@ export default async function Page({ searchParams }: PageProps) {
     );
   }
 
-  const { batch, stalls, orders, catalogue } = view;
+  const { batch, stalls, orders, catalogue, frozenPrices, missingPreorders } = view;
   const clusters = new Map<string, typeof stalls>();
   for (const stall of stalls) {
     clusters.set(stall.cluster, [...(clusters.get(stall.cluster) ?? []), stall]);
@@ -65,6 +65,12 @@ export default async function Page({ searchParams }: PageProps) {
             <dt>Cutoff</dt>
             <dd>{batch.cutoffAt}</dd>
           </div>
+          {batch.cutoffFiredAt ? (
+            <div>
+              <dt>Cutoff fired</dt>
+              <dd>{batch.cutoffFiredAt}</dd>
+            </div>
+          ) : null}
           <div>
             <dt>Vehicle</dt>
             <dd>{batch.vehicleLabel}</dd>
@@ -75,6 +81,51 @@ export default async function Page({ searchParams }: PageProps) {
           </div>
         </dl>
       </section>
+
+      <section>
+        <h2>Frozen prices</h2>
+        {frozenPrices.length === 0 ? (
+          <p className="empty">Prices freeze at Cutoff; nothing is locked yet.</p>
+        ) : (
+          <>
+            <p className="stall-meta">
+              Locked at Cutoff
+              {batch.cutoffFiredAt ? ` · fired ${batch.cutoffFiredAt}` : ''}
+            </p>
+            <ul className="stall-list">
+              {frozenPrices.map((price) => (
+                <li key={price.skuCode}>
+                  <span className="stall-code">{price.skuCode}</span>
+                  <span>{price.nameEn}</span>
+                  <span className="stall-meta">
+                    {rm(price.cartonCost)} per carton · {rm(price.poolBundlePrice)} per{' '}
+                    {price.bundleUnitName.toLowerCase()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+
+      {!open ? (
+        <section>
+          <h2>Stalls with no Preorder</h2>
+          {missingPreorders.length === 0 ? (
+            <p className="empty">Every active Stall ordered before Cutoff.</p>
+          ) : (
+            <ul className="stall-list">
+              {missingPreorders.map((stall) => (
+                <li key={stall.stallCode}>
+                  <span className="stall-code">{stall.stallCode}</span>
+                  <span>{stall.stallName}</span>
+                  <span className="stall-meta">{stall.cluster}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       <section>
         <h2>Order intake</h2>
