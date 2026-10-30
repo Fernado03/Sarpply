@@ -76,3 +76,14 @@ WHERE r.name = 'Premier 101 + Gala City';
 INSERT INTO route_batch_transitions (route_batch_id, transition_type, fired_at)
 SELECT id, 'OPENED', opened_at FROM route_batches
 WHERE delivery_date = DATE '2026-11-05';
+
+-- One shift session for the demo handover screen. Real Runner authentication
+-- and expiry enforcement arrive with the least-privilege ticket.
+INSERT INTO runner_sessions (runner_identity, route_batch_id,
+                             shift_starts_at, shift_ends_at, expires_at)
+SELECT 'Runner A', id,
+       TIMESTAMPTZ '2026-11-05 12:00:00+08',
+       TIMESTAMPTZ '2026-11-05 18:00:00+08',
+       TIMESTAMPTZ '2026-11-05 18:00:00+08'
+FROM route_batches
+WHERE delivery_date = DATE '2026-11-05';

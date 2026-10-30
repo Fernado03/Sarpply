@@ -1,6 +1,8 @@
 import { commitDraft, retryMessages, saveTextDraft, sendBroadcast } from './actions';
+import { confirmHandover } from './handover-actions';
 import { confirmVehicle, receivePurchaseOrder, submitPurchaseOrder } from './purchase-actions';
 import { loadConsole, nextAction, statusLabel } from '@/lib/console';
+import { loadHandover, receiptLabel, type HandoverStallView, type RunnerSessionView } from '@/lib/handover';
 import { loadOpenDrafts } from '@/lib/intake';
 import { loadPurchase, purchaseListText } from '@/lib/purchase';
 
@@ -14,6 +16,159 @@ function firstLine(body: string): string {
   return body.split('\n').find((line) => line.trim() !== '') ?? body;
 }
 
+function HandoverForm({
+  batchId,
+  stall,
+  runners,
+}: {
+  batchId: string;
+  stall: HandoverStallView;
+  runners: RunnerSessionView[];
+}) {
+  return (
+    <form action={confirmHandover} className="card intake-form">
+      <input type="hidden" name="batchId" value={batchId} />
+      <input type="hidden" name="stallId" value={stall.stallId} />
+      <div className="card-head">
+        <strong>
+          {stall.stallCode} · {stall.stallName}
+        </strong>
+        <span className="stall-meta">{stall.cluster}</span>
+      </div>
+      <p className="stall-meta">
+        Ordered total {rm(stall.orderedTotalMyr)}. Enter the Bundles actually handed
+        over; the receipt total follows those counts.
+      </p>
+      <ul className="receipt-lines">
+        {stall.lines.map((line) => (
+          <li key={line.orderId} className="receipt-line">
+            <span className="stall-code">{line.skuCode}</span>
+            <span className="stall-meta">
+              {line.nameEn} · ordered {line.orderedBundles} · {rm(line.unitPrice)} per{' '}
+              {line.bundleUnitName.toLowerCase()}
+            </span>
+            <input
+              name={`delivered-${line.orderId}`}
+              type="number"
+              min="0"
+              max={line.orderedBundles}
+              inputMode="numeric"
+              required
+              placeholder={`Ordered ${line.orderedBundles}`}
+              aria-label={`Delivered Bundles for ${line.skuCode}`}
+            />
+          </li>
+        ))}
+      </ul>
+      <label className="field">
+        <span>Payment method</span>
+        <select name="paymentStatus" defaultValue="UNPAID">
+          <option value="UNPAID">Unpaid — goods handed over</option>
+          <option value="PAID_CASH">Cash</option>
+          <option value="PAID_DUITNOW">DuitNow</option>
+        </select>
+      </label>
+      <label className="field">
+        <span>DuitNow reference (required for DuitNow)</span>
+        <input name="paymentReference" type="text" placeholder="e.g. DUIT-20261105-001" />
+      </label>
+      <label className="field">
+        <span>DuitNow proof link (required for DuitNow)</span>
+        <input name="paymentProofUrl" type="url" placeholder="https://…" />
+      </label>
+      {runners.length > 0 ? (
+        <label className="field">
+          <span>Runner</span>
+          <select name="attestedBy" defaultValue={runners[0].id}>
+            <option value="">No Runner session</option>
+            {runners.map((runner) => (
+              <option key={runner.id} value={runner.id}>
+                {runner.identity}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <p className="stall-meta">
+          No Runner session for this batch; the attestation records the time only.
+        </p>
+      )}
+      {!stall.hasPhone ? (
+        <p className="notice">
+          This Stall has no phone. The handover is recorded internally; no receipt
+          message is sent.
+        </p>
+      ) : null}
+      <button type="submit" className="primary">
+        Confirm handover and send receipt
+      </button>
+    </form>
+  );
+}
+
+function HandoverSummary({ stall }: { stall: HandoverStallView }) {
+  return (
+    <div className="card">
+      <div className="card-head">
+        <strong>
+          {stall.stallCode} · {stall.stallName}
+        </strong>
+        <span className="badge">Handed over</span>
+      </div>
+      <dl className="facts">
+        <div>
+          <dt>Total</dt>
+          <dd>{rm(stall.recordedTotalMyr)}</dd>
+        </div>
+        <div>
+          <dt>Payment</dt>
+          <dd>{statusLabel(stall.paymentStatus ?? 'UNPAID')}</dd>
+        </div>
+        <div>
+          <dt>Attested</dt>
+          <dd>
+            {stall.attestedAt ?? '—'}
+            {stall.runner ? ` · ${stall.runner}` : ''}
+          </dd>
+        </div>
+        <div>
+          <dt>Receipt</dt>
+          <dd>{receiptLabel(stall)}</dd>
+        </div>
+      </dl>
+      <ul className="receipt-lines">
+        {stall.lines.map((line) => (
+          <li key={line.orderId} className="receipt-line">
+            <span className="stall-code">{line.skuCode}</span>
+            <span className="stall-meta">
+              {line.nameEn} · ordered {line.orderedBundles} · {rm(line.unitPrice)} per{' '}
+              {line.bundleUnitName.toLowerCase()}
+            </span>
+            <span className="badge">{line.deliveredBundles} delivered</span>
+          </li>
+        ))}
+      </ul>
+      {!stall.hasPhone ? (
+        <p className="notice error">
+          No message sent: this Stall has no phone. The handover is recorded internally.
+        </p>
+      ) : null}
+      {stall.receiptStatus === 'FAILED' ? (
+        <p className="notice error">
+          Receipt failed: {stall.receiptFailure ?? 'send failed'}. Use Send pending in
+          the message log.
+        </p>
+      ) : null}
+      {stall.receiptBody ? (
+        <details className="copy-list">
+          <summary>Receipt message</summary>
+          <p className="message-body">{stall.receiptBody}</p>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
@@ -24,6 +179,10 @@ export default async function Page({ searchParams }: PageProps) {
 
   const intakeError = typeof params.intakeError === 'string' ? params.intakeError : null;
   const purchaseError = typeof params.purchaseError === 'string' ? params.purchaseError : null;
+  const handoverError = typeof params.handoverError === 'string' ? params.handoverError : null;
+  const handoverSendError =
+    typeof params.handoverSendError === 'string' ? params.handoverSendError : null;
+  const handoverCreated = typeof params.created === 'string' ? params.created : null;
   const notice = typeof params.notice === 'string' ? params.notice : null;
   const sentCount = typeof params.sent === 'string' ? params.sent : '0';
   const failedCount = typeof params.failed === 'string' ? params.failed : '0';
@@ -53,9 +212,10 @@ export default async function Page({ searchParams }: PageProps) {
     clusters.set(stall.cluster, [...(clusters.get(stall.cluster) ?? []), stall]);
   }
   const open = batch.status === 'OPEN_FOR_ORDERS';
-  const failedOutbound = outboundMessages.filter((message) => message.status === 'FAILED').length;
+  const unsentOutbound = outboundMessages.filter((message) => message.status !== 'SENT').length;
   const drafts = await loadOpenDrafts(batch.id);
   const purchase = await loadPurchase(batch.id);
+  const handover = await loadHandover(batch.id);
   const frozen = batch.status !== 'OPEN_FOR_ORDERS';
   const canConfirmVehicle =
     !purchase.vehicleConfirmed &&
@@ -87,6 +247,11 @@ export default async function Page({ searchParams }: PageProps) {
           {purchaseError}
         </p>
       ) : null}
+      {handoverError ? (
+        <p className="notice error" role="alert">
+          {handoverError}
+        </p>
+      ) : null}
       {notice === 'vehicle' ? <p className="notice">Vehicle confirmed for the batch.</p> : null}
       {notice === 'po' ? <p className="notice">Wholesaler PO submitted.</p> : null}
       {notice === 'received' ? (
@@ -97,6 +262,14 @@ export default async function Page({ searchParams }: PageProps) {
       ) : null}
       {notice === 'committed' ? (
         <p className="notice">Preorder committed to the batch.</p>
+      ) : null}
+      {notice === 'handover' ? (
+        <p className={`notice${handoverSendError ? ' error' : ''}`}>
+          {handoverCreated === '0'
+            ? 'Handover already recorded; nothing changed.'
+            : 'Handover recorded.'}
+          {handoverSendError ? ` Sending is unavailable: ${handoverSendError}` : ''}
+        </p>
       ) : null}
       {notice === 'broadcast' || notice === 'retried' ? (
         <p className={`notice${failedCount !== '0' ? ' error' : ''}`}>
@@ -399,6 +572,33 @@ export default async function Page({ searchParams }: PageProps) {
         )}
       </section>
 
+      <section>
+        <h2>Stall handover</h2>
+        {handover.stalls.length === 0 ? (
+          <p className="empty">No Stall has a Preorder to hand over.</p>
+        ) : batch.status !== 'GOODS_RECEIVED' &&
+          !handover.stalls.some((stall) => stall.handoverId) ? (
+          <p className="empty">
+            {batch.status === 'DELIVERED'
+              ? 'No handover is recorded for this batch.'
+              : 'Handover opens after the cartons are received.'}
+          </p>
+        ) : (
+          handover.stalls.map((stall) =>
+            stall.handoverId ? (
+              <HandoverSummary key={stall.stallId} stall={stall} />
+            ) : batch.status === 'GOODS_RECEIVED' ? (
+              <HandoverForm
+                key={stall.stallId}
+                batchId={batch.id}
+                stall={stall}
+                runners={handover.runners}
+              />
+            ) : null,
+          )
+        )}
+      </section>
+
       {!open ? (
         <section>
           <h2>Stalls with no Preorder</h2>
@@ -561,26 +761,27 @@ export default async function Page({ searchParams }: PageProps) {
 
       <section>
         <h2>Message log</h2>
-        {open ? (
-          <div className="message-actions">
+        <div className="message-actions">
+          {open ? (
             <form action={sendBroadcast}>
               <input type="hidden" name="batchId" value={batch.id} />
               <button type="submit" className="primary">
                 Queue and send Tuesday broadcast
               </button>
             </form>
-            {failedOutbound > 0 ? (
-              <form action={retryMessages}>
-                <input type="hidden" name="batchId" value={batch.id} />
-                <button type="submit" className="secondary">
-                  Retry failed ({failedOutbound})
-                </button>
-              </form>
-            ) : null}
-          </div>
-        ) : (
+          ) : null}
+          {unsentOutbound > 0 ? (
+            <form action={retryMessages}>
+              <input type="hidden" name="batchId" value={batch.id} />
+              <button type="submit" className="secondary">
+                Send pending ({unsentOutbound})
+              </button>
+            </form>
+          ) : null}
+        </div>
+        {!open ? (
           <p className="empty">The broadcast belongs to an open Route Batch.</p>
-        )}
+        ) : null}
 
         <h3>Outbound</h3>
         {outboundMessages.length === 0 ? (
