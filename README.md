@@ -1,0 +1,38 @@
+# Sarpply Operations Ledger
+
+Phase 2 walking skeleton: a PostgreSQL ledger with a phone-first operator console. The database is
+the system of record; application code renders and orchestrates, and never recomputes GP, Buffer
+Stock value or the reconciliation identity.
+
+## Stack
+
+- **PostgreSQL 16** — schema, views and (in later tickets) functions. Migrations are plain SQL in
+  `db/migrations/`.
+- **Next.js 16 + TypeScript** — console shell in `src/app/`.
+- **Vitest** — tests at the PostgreSQL seam only.
+- **embedded-postgres** — starts a real PostgreSQL 16 cluster for development and tests when no
+  external server is configured.
+
+## Run it
+
+```bash
+npm install
+npm run db:reset        # create, migrate, seed and load B01/B02 fixtures
+npm run db:dev          # keep the embedded PostgreSQL server up (second terminal)
+npm run dev             # console at http://localhost:3000
+```
+
+`db:reset` stops its embedded server when it finishes, so `db:dev` keeps one running for the app.
+Alternatively point `DATABASE_URL` at an existing PostgreSQL 16 server (see `.env.example`) and
+skip `db:dev`. Next.js loads `.env.local` automatically; the scripts do too.
+
+## Tests
+
+```bash
+npm test
+```
+
+The harness starts an isolated real PostgreSQL database, applies migrations, seeds, loads the
+Phase 1 workbook fixtures, and queries through SQL. No database mock. If `TEST_DATABASE_URL` is
+set, the harness resets the `public` schema of that database instead of starting an embedded
+server.

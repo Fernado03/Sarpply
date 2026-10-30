@@ -1,0 +1,48 @@
+{
+  "name": "sarpply",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:reset": "tsx scripts/db.ts reset",
+    "db:dev": "tsx scripts/db.ts dev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fernado03/Sarpply.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Fernado03/Sarpply/issues"
+  },
+  "homepage": "https://github.com/Fernado03/Sarpply#readme",
+  "private": "true",
+  "type": "module",
+  "dependencies": {
+    "embedded-postgres": "^16.14.0-beta.17",
+    "next": "^16.4.3",
+    "pg": "^8.23.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@e965/xlsx": "^0.20.3",
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}
