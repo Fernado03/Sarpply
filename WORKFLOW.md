@@ -11,11 +11,11 @@ Legend: `✅` done · `👉` current · `⬜` not started · `⏭` not applicabl
 ## Current position
 
 ```text
-✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅, #4 ✅, #5 ✅, #6 ✅; next #7) → ⬜ code-review → ⬜ pr → ⬜ retro
+✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅, #4 ✅, #5 ✅, #6 ✅, #7 ✅; next #8) → ⬜ code-review → ⬜ pr → ⬜ retro
 ```
 
-- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a), ticket #4 text intake (§4b), ticket #5 Cutoff (§4c), ticket #6 WhatsApp transport (§4d).
-- **Now:** `/implement #7` (Purchase) or `/implement #12` (gate warning before Cutoff) — both are unblocked. #8 needs #6 and #7.
+- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a), ticket #4 text intake (§4b), ticket #5 Cutoff (§4c), ticket #6 WhatsApp transport (§4d), ticket #7 purchase and receipt (§4e).
+- **Now:** `/implement #8` (Delivery) or `/implement #12` (gate warning before Cutoff) — both are unblocked. #9 needs #8; #10 needs #7 and #8; #11 needs #7, #8 and #9.
 - **After that:** the rest of the graph; `/pr`, `/retro` at the end.
 
 ---
@@ -219,6 +219,21 @@ Per-ticket loop:
 - **Review:** Standards — 2 hard violations, 1 judgement call. Broadcast timing was hardcoded; fixed in `6919a47` so the cutoff day/time and delivery day come from the batch. Voice-note deletion is **#16** (blocked by #11 and #15), not this ticket: #6 stores metadata only. Concurrent double-send is a residual risk accepted for the single-writer console. Spec — 3 findings, none required a code change: the `(N bungkus)` labels match Script B and the SKU bundle counts; the fake injects send failure/retry while every assertion reads database state (the ticket's own delivery acceptance); at-least-once provider duplication is documented in `README.md` because the Cloud API has no idempotency key for a text send.
 - **Next:** `/clear`, then `/implement #7` (Purchase) or #12 (gate warning) — both unblocked. #8 needs #6 and #7.
 
+### ✅ 4e. Ticket #7 — purchase and receipt, 2026-10-30
+
+- **Closed:** [#7](https://github.com/Fernado03/Sarpply/issues/7) on 2026-10-30 with the evidence comment.
+- **Commits:** `90e5665` (implementation), `db9cacc` (review fixes). Branch `main`.
+- **Purchase plan:** `v_purchase_plan` publishes per SKU Ordered Bundles, Buffer Stock on hand, Route cartons, physical boxes, geometric litres, frozen carton cost and cash. `v_purchase_plan_total` publishes the batch totals so the console never re-adds money. B01 still shows 13 cartons, 18 boxes, 901.5 L geometric, 979.9 L packed, and fits the 980 L Myvi at 0.92.
+- **Allocation:** `v_sortie_carton_allocation` rounds once at Route level, then splits whole cartons by largest remainder proportional to each Sortie's Ordered Bundles, ties to the lower `trip_number`. `v_sortie_load` checks the allocated cartons against the batch Vehicle; `packed_liters_shared` is retired. Rule recorded in `docs/adr/0019-route-cartons-allocated-by-largest-remainder.md`.
+- **Vehicle:** `fn_confirm_batch_vehicle` only runs after Cutoff, records `route_batches.vehicle_confirmed_at`, and makes the choice final. Re-confirming a different Vehicle is refused.
+- **Wholesaler PO:** `fn_submit_wholesaler_po` refuses an open book, an unconfirmed Vehicle, the 30-minute gap, a Sortie over capacity, an empty plan, and a Wholesaler that did not quote the frozen prices. Lines come from `v_purchase_plan`; a trigger enforces that the frozen carton cost, not the live price, is used. A retry returns the same PO.
+- **Receipt:** `fn_receive_po` is one operation: writes every PO line, records `received_at`, derives `cash_required_myr` from cartons received, and posts one immutable `PURCHASE_RECEIPT` movement per line at the frozen cost (`PO:<po>:<sku>`). Same counts return 0 movements; different counts are refused. Short receipts remain visible and are never auto-corrected.
+- **Cost precision:** `stock_movements.unit_cost_myr` is now `NUMERIC(12,6)` and the weighted average rounds to six decimals, so a carton cost that does not divide evenly (RM 100 / 12) still values at the cent. `ADR-0018` records why.
+- **Console:** purchase table, copyable purchase list, Sortie fit badges, Vehicle confirmation, PO submission, explicit receipt counts (empty, not pre-filled with ordered), shortfall notice, and cash from received. The received time is the receipt operation's `NOW()`, recorded on the PO.
+- **Evidence:** `npm test` 72 passed (10 new purchase tests at the PostgreSQL seam); `npm run typecheck` and `npm run build` clean. Browser smoke at 360 px (`scrollWidth` 360 = `innerWidth`): 13 cartons, 18 boxes, 901.50 L, Sortie 1 at 979.9 / 980 L fits; Vehicle confirmed; PO submitted; A1 received 2 of 3 with the rest full → cash RM 1,538.00 and `Short receipt: A1 short 1` visible.
+- **Review:** Standards — 2 must-fix (cent precision, PO Wholesaler vs frozen snapshot) and 1 should-fix (stale `v_sortie_load` guide) fixed; 1 judgement call (duplicate totals) fixed through `v_purchase_plan_total`. Spec — retry buffer drift, hidden short receipts, early Vehicle confirmation/re-basing and non-divisible cost precision fixed; received time is recorded by the operation rather than typed.
+- **Next:** `/clear`, then `/implement #8` (Delivery) or `/implement #12` (gate warning) — both unblocked. #9 needs #8; #10 needs #7 and #8; #11 needs #7, #8 and #9.
+
 ## ⬜ 5. Review — `/code-review`
 
 - Runs inside `/implement`; can also be typed on its own.
@@ -341,3 +356,5 @@ Never compact mid-phase. Every move except Continue turns a primary source into 
 | 2026-10-30 | Code review #5 | `/code-review a186064` | Standards 0 hard violations, 3 judgement calls; Spec 2 findings (PO gap unused, price pairing); both fixed | `ff8ff1f` |
 | 2026-10-30 | Implement #6 | `/implement 6` | WhatsApp transport landed; issue #6 closed | `89fb68b`, `6919a47`; 62 tests at the adapter and database seams |
 | 2026-10-30 | Code review #6 | `/code-review 969d3bf` | Standards 2 hard (timing fixed; retention deferred to #16), 1 judgement; Spec 3 (labels verified, fake seam accepted, at-least-once documented) | `6919a47` |
+| 2026-10-30 | Implement #7 | `/implement 7` | Purchase plan, Wholesaler PO, receipt and console landed; issue #7 closed | `90e5665`, `db9cacc`; 72 tests at the database seam |
+| 2026-10-30 | Code review #7 | `/code-review 203d269` | Standards 2 must (cent precision, supplier mismatch), 1 should (stale guide), 1 judgement (totals); Spec 4 code findings (retry buffer, short defaults, Vehicle re-basing, cost precision); all code findings fixed | `db9cacc`; `ADR-0018`/`0019`; `v_purchase_plan_total` |
