@@ -99,6 +99,10 @@ function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+function round6(value: number): number {
+  return Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000;
+}
+
 function sourceChannel(source: string): 'TEXT' | 'VOICE' | 'STALL' {
   switch (source) {
     case 'TEXT':
@@ -342,7 +346,7 @@ export async function loadPhase1Fixtures(client: Client): Promise<void> {
           vehicleId,
           line.cartonsReceived * perCarton,
           `FIXTURE:${batchId}:${line.skuCode}:RECEIPT`,
-          round2(line.cartonCost / perCarton),
+          round6(line.cartonCost / perCarton),
           batchUuid,
           atMyTime(deliveryDate, '07:45:00'),
         ],

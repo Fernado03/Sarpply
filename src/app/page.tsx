@@ -68,16 +68,9 @@ export default async function Page({ searchParams }: PageProps) {
         batch.vehicleLabel,
         batch.sortieCount,
         purchase.lines,
+        purchase.totals,
       )
     : '';
-  const purchaseTotal = purchase.lines.reduce(
-    (sum, line) => ({
-      cartons: sum.cartons + line.cartons,
-      boxes: sum.boxes + line.physicalBoxes,
-      cash: sum.cash + Number(line.cashMyr ?? 0),
-    }),
-    { cartons: 0, boxes: 0, cash: 0 },
-  );
 
   return (
     <main>
@@ -264,11 +257,11 @@ export default async function Page({ searchParams }: PageProps) {
                 <tfoot>
                   <tr>
                     <td colSpan={4}>Total</td>
-                    <td>{purchaseTotal.cartons}</td>
-                    <td>{purchaseTotal.boxes}</td>
+                    <td>{purchase.totals.cartons}</td>
+                    <td>{purchase.totals.physicalBoxes}</td>
+                    <td>{purchase.totals.geometricLiters}</td>
                     <td></td>
-                    <td></td>
-                    <td>{rm(purchaseTotal.cash.toFixed(2))}</td>
+                    <td>{rm(purchase.totals.cashMyr)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -387,7 +380,7 @@ export default async function Page({ searchParams }: PageProps) {
                             type="number"
                             min="0"
                             max={line.cartonsOrdered}
-                            defaultValue={line.cartonsOrdered}
+                            placeholder={`Ordered ${line.cartonsOrdered}`}
                             inputMode="numeric"
                             required
                             aria-label={`Cartons received for ${line.skuCode}`}

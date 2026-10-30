@@ -20,6 +20,16 @@ SELECT a.route_batch_id,
 FROM v_route_batch_aggregation a
 JOIN skus s ON s.sku_code = a.sku_code;
 
+-- ─── Purchase list totals, so the console never re-adds money ──────────────
+CREATE OR REPLACE VIEW v_purchase_plan_total AS
+SELECT route_batch_id,
+       COALESCE(SUM(cartons), 0)::INT AS cartons,
+       COALESCE(SUM(physical_boxes), 0)::INT AS physical_boxes,
+       COALESCE(SUM(geometric_liters), 0)::NUMERIC(12,2) AS geometric_liters,
+       COALESCE(SUM(cash_myr), 0)::NUMERIC(12,2) AS cash_myr
+FROM v_purchase_plan
+GROUP BY route_batch_id;
+
 -- ─── Carton allocation across Sorties ──────────────────────────────────────
 -- Cartons are rounded ONCE at Route level (v_route_batch_aggregation), then
 -- split across Sorties as whole cartons by largest remainder:
@@ -130,9 +140,9 @@ CREATE OR REPLACE FUNCTION fn_confirm_batch_vehicle(
   p_vehicle_id     UUID
 ) RETURNS VOID LANGUAGE plpgsql AS $$
 DECLARE
-  v_status VARCHAR(24);
+  v_batch RECORD;
 BEGIN
-  SELECT status INTO v_status
+  SELECT * INTO v_batch
     FROM route_batches
    WHERE id = p_route_batch_id
      FOR UPDATE;
@@ -141,9 +151,20 @@ BEGIN
     RAISE EXCEPTION 'unknown Route Batch %', p_route_batch_id
       USING ERRCODE = 'no_data_found';
   END IF;
-  IF v_status NOT IN ('OPEN_FOR_ORDERS', 'CLOSED_AT_CUTOFF') THEN
+  IF v_batch.status = 'OPEN_FOR_ORDERS' THEN
+    RAISE EXCEPTION 'confirm the Vehicle after Cutoff'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF v_batch.status <> 'CLOSED_AT_CUTOFF' THEN
     RAISE EXCEPTION 'the Vehicle is fixed once the Wholesaler PO is submitted'
       USING ERRCODE = 'check_violation';
+  END IF;
+  IF v_batch.vehicle_confirmed_at IS NOT NULL THEN
+    IF v_batch.vehicle_id IS DISTINCT FROM p_vehicle_id THEN
+      RAISE EXCEPTION 'the Vehicle is already confirmed for this Route Batch'
+        USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM vehicles WHERE id = p_vehicle_id) THEN
     RAISE EXCEPTION 'unknown Vehicle %', p_vehicle_id
@@ -206,6 +227,7 @@ DECLARE
   v_wholesaler  UUID;
   v_bad         RECORD;
   v_lines       INT;
+  v_quoted_by   VARCHAR(120);
 BEGIN
   SELECT * INTO v_batch
     FROM route_batches
@@ -243,6 +265,26 @@ BEGIN
   IF p_now < fn_po_not_before(p_route_batch_id) THEN
     RAISE EXCEPTION 'Wholesaler PO may not be submitted before %',
       fn_po_not_before(p_route_batch_id)
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- The frozen costs name their Wholesaler (ADR-0008). A PO cannot select a
+  -- different supplier and keep those prices.
+  SELECT w.name INTO v_quoted_by
+    FROM v_purchase_plan p
+    JOIN route_batch_prices rbp
+      ON rbp.route_batch_id = p.route_batch_id
+     AND rbp.sku_code = p.sku_code
+    JOIN wholesaler_prices wp ON wp.id = rbp.wholesaler_price_id
+    JOIN wholesalers w ON w.id = wp.wholesaler_id
+   WHERE p.route_batch_id = p_route_batch_id
+     AND p.cartons > 0
+     AND wp.wholesaler_id <> p_wholesaler_id
+   ORDER BY w.name
+   LIMIT 1;
+  IF v_quoted_by IS NOT NULL THEN
+    RAISE EXCEPTION 'the frozen prices for this Route Batch were quoted by %, not the selected Wholesaler',
+      v_quoted_by
       USING ERRCODE = 'check_violation';
   END IF;
 
@@ -446,7 +488,7 @@ BEGIN
       p_movement_type => 'PURCHASE_RECEIPT',
       p_idempotency_key => format('PO:%s:%s', p_po, v_line.sku_code),
       p_unit_cost_myr => ROUND(
-        v_line.carton_cost / v_line.bundles_per_master_carton, 2
+        v_line.carton_cost / v_line.bundles_per_master_carton, 6
       ),
       p_route_batch_id => v_batch_id,
       p_occurred_at => p_received_at

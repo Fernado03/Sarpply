@@ -52,8 +52,16 @@ export interface PurchaseOrderView {
   lines: PoLineView[];
 }
 
+export interface PurchaseTotalsView {
+  cartons: number;
+  physicalBoxes: number;
+  geometricLiters: string;
+  cashMyr: string;
+}
+
 export interface PurchaseView {
   lines: PurchaseLineView[];
+  totals: PurchaseTotalsView;
   sorties: SortieLoadView[];
   vehicles: VehicleView[];
   wholesalers: WholesalerView[];
@@ -79,6 +87,16 @@ export async function loadPurchase(routeBatchId: string): Promise<PurchaseView> 
      FROM v_purchase_plan p
      WHERE p.route_batch_id = $1
      ORDER BY p.sku_code`,
+    [routeBatchId],
+  );
+
+  const totals = await pool.query<PurchaseTotalsView>(
+    `SELECT cartons,
+            physical_boxes AS "physicalBoxes",
+            geometric_liters::text AS "geometricLiters",
+            cash_myr::text AS "cashMyr"
+     FROM v_purchase_plan_total
+     WHERE route_batch_id = $1`,
     [routeBatchId],
   );
 
@@ -144,6 +162,7 @@ export async function loadPurchase(routeBatchId: string): Promise<PurchaseView> 
 
   return {
     lines: lines.rows,
+    totals: totals.rows[0],
     sorties: sorties.rows,
     vehicles: vehicles.rows,
     wholesalers: wholesalers.rows,
@@ -216,17 +235,9 @@ export function purchaseListText(
   vehicleLabel: string,
   sortieCount: number,
   lines: PurchaseLineView[],
+  totals: PurchaseTotalsView,
 ): string {
   const buying = lines.filter((line) => line.cartons > 0);
-  const total = buying.reduce(
-    (sum, line) => ({
-      cartons: sum.cartons + line.cartons,
-      boxes: sum.boxes + line.physicalBoxes,
-      liters: sum.liters + Number(line.geometricLiters),
-      cash: sum.cash + Number(line.cashMyr ?? 0),
-    }),
-    { cartons: 0, boxes: 0, liters: 0, cash: 0 },
-  );
 
   const body = buying.map((line) =>
     [
@@ -246,6 +257,6 @@ export function purchaseListText(
     '',
     ...body,
     '',
-    `TOTAL | ${total.cartons} cartons, ${total.boxes} boxes, ${total.liters.toFixed(2)} L | RM ${total.cash.toFixed(2)}`,
+    `TOTAL | ${totals.cartons} cartons, ${totals.physicalBoxes} boxes, ${totals.geometricLiters} L | RM ${Number(totals.cashMyr).toFixed(2)}`,
   ].join('\n');
 }

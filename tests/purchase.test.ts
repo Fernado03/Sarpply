@@ -92,6 +92,22 @@ describe('Purchase plan', () => {
         cash_myr: '90.00',
       },
     ]);
+
+    const [totals] = await query<{
+      cartons: number;
+      boxes: number;
+      liters: string;
+      cash: string;
+    }>(
+      `SELECT t.cartons,
+              t.physical_boxes AS boxes,
+              t.geometric_liters::text AS liters,
+              t.cash_myr::text AS cash
+       FROM v_purchase_plan_total t
+       JOIN route_batches b ON b.id = t.route_batch_id
+       WHERE b.delivery_date = DATE '2026-10-15'`,
+    );
+    expect(totals).toEqual({ cartons: 13, boxes: 18, liters: '901.50', cash: '1673.00' });
   });
 });
 
@@ -266,6 +282,15 @@ describe('Wholesaler PO submission', () => {
       const batchId = await createBatch(db, '2027-11-11', '2027-11-10T12:00:00+08');
       await placePreorder(db, batchId, 'S01', 'A1', 10);
 
+      const tooSoon = await expectRejectedIn(
+        db,
+        `SELECT fn_confirm_batch_vehicle(
+           $1, (SELECT id FROM vehicles WHERE label = 'Myvi')
+         )`,
+        [batchId],
+      );
+      expect(tooSoon.message).toContain('after Cutoff');
+
       const beforeCutoff = await expectRejectedIn(
         db,
         `SELECT fn_submit_wholesaler_po(
@@ -287,6 +312,15 @@ describe('Wholesaler PO submission', () => {
       expect(unconfirmed.message).toContain('confirm the Vehicle');
 
       await confirmVehicle(db, batchId, 'Myvi');
+
+      const changed = await expectRejectedIn(
+        db,
+        `SELECT fn_confirm_batch_vehicle(
+           $1, (SELECT id FROM vehicles WHERE label = 'Alza')
+         )`,
+        [batchId],
+      );
+      expect(changed.message).toContain('already confirmed');
 
       const tooEarly = await expectRejectedIn(
         db,
@@ -358,6 +392,38 @@ describe('Wholesaler PO submission', () => {
       expect(lines.rows).toEqual([
         { sku_code: 'A1', cartons_ordered: 1, carton_cost: '135.00' },
       ]);
+    });
+  });
+
+  it('refuses a Wholesaler that did not quote the frozen prices', async () => {
+    await withTransaction(async (db) => {
+      const batchId = await createBatch(db, '2028-01-06', '2028-01-05T12:00:00+08');
+      await placePreorder(db, batchId, 'S01', 'A1', 10);
+      await freeze(db, batchId, '2028-01-05T12:01:00+08');
+      await confirmVehicle(db, batchId, 'Myvi');
+
+      const [other] = (
+        await db.query<{ id: string }>(
+          `INSERT INTO wholesalers (name) VALUES ('Demak Packaging')
+           RETURNING id`,
+        )
+      ).rows;
+
+      const refused = await expectRejectedIn(
+        db,
+        'SELECT fn_submit_wholesaler_po($1, $2, $3)',
+        [batchId, other.id, '2028-01-05T12:31:00+08'],
+      );
+      expect(refused.message).toContain('quoted by Pending Packaging Supplies');
+
+      const noPo = await db.query(
+        'SELECT 1 FROM wholesaler_pos WHERE route_batch_id = $1',
+        [batchId],
+      );
+      expect(noPo.rowCount).toBe(0);
+
+      const poId = await submitPo(db, batchId, '2028-01-05T12:32:00+08');
+      expect(poId).toBeTruthy();
     });
   });
 
@@ -544,7 +610,7 @@ describe('Wholesaler PO receipt', () => {
         {
           sku_code: 'A1',
           quantity_bundles: 10,
-          unit_cost: '13.50',
+          unit_cost: '13.500000',
           movement_type: 'PURCHASE_RECEIPT',
           idempotency_key: `PO:${poId}:A1`,
           route_batch_id: batchId,
@@ -560,6 +626,19 @@ describe('Wholesaler PO receipt', () => {
         )
       ).rows;
       expect(transition.fired_exactly).toBe(true);
+
+      const bufferBefore = await db.query<{
+        opening: number;
+        closing: number;
+        closing_cost: string;
+      }>(
+        `SELECT SUM(opening_bundles)::int AS opening,
+                SUM(closing_bundles)::int AS closing,
+                SUM(closing_cost_myr)::text AS closing_cost
+         FROM v_batch_buffer
+         WHERE route_batch_id = $1`,
+        [batchId],
+      );
 
       // Re-running the same receipt is a no-op: no movement, no cash change.
       expect(
@@ -578,6 +657,20 @@ describe('Wholesaler PO receipt', () => {
         [batchId],
       );
       expect(afterRetry.rowCount).toBe(1);
+
+      const bufferAfter = await db.query<{
+        opening: number;
+        closing: number;
+        closing_cost: string;
+      }>(
+        `SELECT SUM(opening_bundles)::int AS opening,
+                SUM(closing_bundles)::int AS closing,
+                SUM(closing_cost_myr)::text AS closing_cost
+         FROM v_batch_buffer
+         WHERE route_batch_id = $1`,
+        [batchId],
+      );
+      expect(bufferAfter.rows).toEqual(bufferBefore.rows);
       const [cash] = (
         await db.query<{ cash_required: string; received_at: string }>(
           `SELECT cash_required_myr::text AS cash_required, received_at::text AS received_at
@@ -601,6 +694,57 @@ describe('Wholesaler PO receipt', () => {
         ],
       );
       expect(changed.message).toContain('immutable');
+    });
+  });
+
+  it('keeps a receipt at the cent when the carton cost does not divide evenly', async () => {
+    await withTransaction(async (db) => {
+      await db.query(
+        `UPDATE wholesaler_prices SET carton_cost = 100.00
+         WHERE sku_code = 'C1' AND valid_to IS NULL`,
+      );
+
+      const batchId = await createBatch(db, '2028-03-09', '2028-03-08T12:00:00+08');
+      await placePreorder(db, batchId, 'S03', 'C1', 12);
+      await freeze(db, batchId, '2028-03-08T12:01:00+08');
+      await confirmVehicle(db, batchId, 'Myvi');
+      const poId = await submitPo(db, batchId, '2028-03-08T12:31:00+08');
+
+      expect(
+        await receivePo(
+          db,
+          poId,
+          [{ skuCode: 'C1', cartonsReceived: 1 }],
+          '2028-03-09T07:30:00+08',
+        ),
+      ).toBe(1);
+
+      const [row] = (
+        await db.query<{
+          carton_cost: string;
+          cash_required: string;
+          unit_cost: string;
+          ledger_value: string;
+        }>(
+          `SELECT l.carton_cost::text AS carton_cost,
+                  p.cash_required_myr::text AS cash_required,
+                  m.unit_cost_myr::text AS unit_cost,
+                  (m.quantity_bundles * m.unit_cost_myr)::numeric(12,2)::text AS ledger_value
+           FROM wholesaler_pos p
+           JOIN wholesaler_po_lines l ON l.po_id = p.id
+           JOIN stock_movements m
+             ON m.idempotency_key = format('PO:%s:%s', p.id, l.sku_code)
+           WHERE p.id = $1`,
+          [poId],
+        )
+      ).rows;
+
+      expect(row).toEqual({
+        carton_cost: '100.00',
+        cash_required: '100.00',
+        unit_cost: '8.333333',
+        ledger_value: '100.00',
+      });
     });
   });
 });

@@ -235,7 +235,7 @@ CREATE TABLE stock_movements (
   -- invoice cost; outbound movements carry the weighted-average cost of the
   -- balance before them (ADR-0018). Never NULL: buffer value must be
   -- computable from the ledger alone.
-  unit_cost_myr   NUMERIC(10,2) NOT NULL CHECK (unit_cost_myr > 0),
+  unit_cost_myr   NUMERIC(12,6) NOT NULL CHECK (unit_cost_myr > 0),
   movement_type   VARCHAR(24) NOT NULL
                     CHECK (movement_type IN (
                       'PURCHASE_RECEIPT','DELIVERY','SPOT_SALE',

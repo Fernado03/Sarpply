@@ -336,46 +336,17 @@ LEFT JOIN route_batch_prices rbp
        ON rbp.route_batch_id = b.id AND rbp.sku_code = sk.sku_code;
 
 -- ─── Sortie volume check ───────────────────────────────────────────────────
--- Two numbers matter, and they are different:
---   packed_liters         whole cartons this Cluster would need ALONE
---                         (safe upper bound; assumes no carton sharing)
---   packed_liters_shared  its share if Route cartons are split proportionally
---                         across Sorties (an OPTIMISTIC floor, not a plan).
---                         A Sortie still loads whole cartons, so plan against
---                         packed_liters; treat _shared as the theoretical best.
--- Rule: purchase carts at Route level (ADR-0006), then assign each carton to
--- ONE Sortie. Use packed_liters to check the vehicle; use _shared to plan
--- how many cartons move on each run. Never let packed_liters exceed the vehicle.
-CREATE OR REPLACE VIEW v_sortie_load AS
-WITH cluster_demand AS (
-  SELECT b.id AS route_batch_id, c.trip_number, o.sku_code,
-         SUM(o.ordered_bundles)::INT AS q_bundles
-  FROM route_batches b
-  JOIN routes r  ON r.id = b.route_id
-  JOIN clusters c ON c.route_id = r.id
-  JOIN stalls st  ON st.cluster_id = c.id
-  JOIN stall_orders o ON o.stall_id = st.id AND o.route_batch_id = b.id
-  WHERE o.order_type = 'PREORDER'
-  GROUP BY b.id, c.trip_number, o.sku_code
-), per_cluster AS (
-  SELECT cd.route_batch_id, cd.trip_number, cd.sku_code, cd.q_bundles,
-         CEIL(cd.q_bundles::NUMERIC / sk.bundles_per_master_carton)::INT AS c_cartons,
-         sk.carton_geometric_liters,
-         sk.bundles_per_master_carton
-  FROM cluster_demand cd JOIN skus sk USING (sku_code)
-)
-SELECT pc.route_batch_id,
-       pc.trip_number,
-       ROUND(SUM(pc.c_cartons  * pc.carton_geometric_liters) / v.packing_efficiency, 1) AS packed_liters,
-       ROUND(SUM(pc.q_bundles::NUMERIC / pc.bundles_per_master_carton
-                 * pc.carton_geometric_liters) / v.packing_efficiency, 1)               AS packed_liters_shared,
-       v.max_cargo_liters,
-       (SUM(pc.c_cartons * pc.carton_geometric_liters) / v.packing_efficiency) <= v.max_cargo_liters AS fits
-FROM per_cluster pc
-JOIN route_batches b ON b.id = pc.route_batch_id
-JOIN routes r        ON r.id = b.route_id
-JOIN vehicles v      ON v.id = r.vehicle_id
-GROUP BY pc.route_batch_id, pc.trip_number, v.max_cargo_liters, v.packing_efficiency;
+-- Phase 2 implementation: db/migrations/0010_purchase.sql, ADR-0019.
+-- Cartons are rounded ONCE at Route level, then allocated to Sorties as whole
+-- cartons by largest remainder (proportional to each Sortie's Ordered
+-- Bundles; ties to the lower trip_number). The load is:
+--
+--   ROUND(SUM(allocated_cartons × carton_geometric_liters)
+--         / vehicles.packing_efficiency, 1)
+--
+-- checked against vehicles.max_cargo_liters for the batch's Vehicle.
+-- `packed_liters_shared` is retired: it was an optimistic proportional floor,
+-- never a load plan, and a Sortie still loads whole cartons.
 
 -- ─── Three margin figures ──────────────────────────────────────────────────
 CREATE OR REPLACE VIEW v_route_batch_pnl AS
@@ -633,14 +604,18 @@ Both would have shipped. This is the argument for executing DDL rather than revi
 
 ### 9.1 Vehicle finding
 
-`v_sortie_load` reports two numbers per Sortie. For the 14-Stall Route:
+**Superseded by `ADR-0019`.** This is the v1.1 planning record at 800 L and 0.80. The Phase 2
+`v_sortie_load` publishes one figure per Sortie, `packed_liters`, from the Route cartons allocated
+by largest remainder; `packed_liters_shared` no longer exists.
+
+The v1.1 view reported two numbers per Sortie. For the 14-Stall Route:
 
 | Bound | Sortie 1 | Sortie 2 | Fits Myvi (800 L)? |
 | :--- | ---: | ---: | :--- |
 | `packed_liters` (whole cartons, no sharing) | 910.8 | 910.8 | ✗ |
 | `packed_liters_shared` (proportional split) | 770.1 | 770.1 | ✓ (but see below) |
 
-Sharing is not a real option at this size: 22 cartons total 1,317.7 L geometric, and two 800 L Myvi trips at 80 % fill carry 1,280 L. **The Route is 38 L short of two Myvi trips** — so the 14-Stall Route needs Avanza-class, exactly as `ADR-0015` concluded, and the proportional figure is retained only to show the theoretical floor.
+Sharing is not a real option at this size: 22 cartons total 1,317.7 L geometric, and two 800 L Myvi trips at 80 % fill carry 1,280 L. **The Route is 38 L short of two Myvi trips** — so the 14-Stall Route needs Avanza-class, exactly as `ADR-0015` concluded. The proportional figure is retired; it was never a load plan.
 
 ### 9.2 Carton allocation across Sorties
 
@@ -650,6 +625,8 @@ Whole cartons cannot be split, so the real question is how 22 cartons divide bet
 | :--- | ---: | :--- | :--- | :--- |
 | **12-Stall** | 19 | 10 / 9 | 770 L + 768 L | ✓ with **30 L** spare |
 | **14-Stall** | 22 | 11 / 11 | 869 L + 778 L | ✗ heavier Sortie over 800 L |
+
+Phase 2 implements the largest-remainder allocation in `ADR-0019`, not the exhaustive split above.
 
 Two consequences the app must honour:
 

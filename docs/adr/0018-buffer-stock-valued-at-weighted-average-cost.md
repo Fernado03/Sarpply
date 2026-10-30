@@ -5,7 +5,7 @@
 ## Decision
 
 Every `stock_movements` row records `unit_cost_myr`, the cost of one Bundle at the moment the
-movement was posted:
+movement was posted, stored to six decimal places:
 
 - **Purchases** carry the invoice cost divided by the Master Carton Ratio.
 - **Outbound movements** (delivery, spot sale, write-off, manual adjustment) carry the moving
@@ -34,6 +34,9 @@ earn. `ADR-0010` already requires the identity to hold across weeks with carried
 
 ## Consequences
 
+- Six decimal places are load-bearing, not cosmetic. `RM 100.00 / 12` Bundles is 8.333333, and
+  two decimals would make a received carton's ledger value RM 99.96 against RM 100.00 of cash.
+  The identity would show four cents of false profit on a cost the business never earned.
 - Receipts and outbound movements must both be posted inside one transaction with the balance
   locked, so two concurrent movements cannot read the same average.
 - A receipt changes the average for **future** outbound movements only. It does not revalue stock

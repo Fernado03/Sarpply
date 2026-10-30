@@ -56,7 +56,7 @@ BEGIN
       RAISE EXCEPTION 'cannot post % Bundles against a balance of %', p_quantity_bundles, v_on_hand
         USING ERRCODE = 'check_violation';
     END IF;
-    v_unit_cost := ROUND(v_value / NULLIF(v_on_hand, 0), 2);
+    v_unit_cost := ROUND(v_value / NULLIF(v_on_hand, 0), 6);
   END IF;
 
   INSERT INTO stock_movements
