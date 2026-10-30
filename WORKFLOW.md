@@ -11,11 +11,11 @@ Legend: `✅` done · `👉` current · `⬜` not started · `⏭` not applicabl
 ## Current position
 
 ```text
-✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅, #4 ✅, #5 ✅, #6 ✅, #7 ✅; next #8) → ⬜ code-review → ⬜ pr → ⬜ retro
+✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅, #4 ✅, #5 ✅, #6 ✅, #7 ✅, #8 ✅; next #9) → ⬜ code-review → ⬜ pr → ⬜ retro
 ```
 
-- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a), ticket #4 text intake (§4b), ticket #5 Cutoff (§4c), ticket #6 WhatsApp transport (§4d), ticket #7 purchase and receipt (§4e).
-- **Now:** `/implement #8` (Delivery) or `/implement #12` (gate warning before Cutoff) — both are unblocked. #9 needs #8; #10 needs #7 and #8; #11 needs #7, #8 and #9.
+- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a), ticket #4 text intake (§4b), ticket #5 Cutoff (§4c), ticket #6 WhatsApp transport (§4d), ticket #7 purchase and receipt (§4e), ticket #8 delivery, attestation and receipt echo (§4f).
+- **Now:** `/clear`, then `/implement #9` (Spot Sales) on the core path; #10 (shortfall rationing), #12 (gate warning), #13 (Runner least privilege) and #15 (voice orders) are also unblocked. #11 needs #9; #14 and #17 need #11.
 - **After that:** the rest of the graph; `/pr`, `/retro` at the end.
 
 ---
@@ -234,6 +234,19 @@ Per-ticket loop:
 - **Review:** Standards — 2 must-fix (cent precision, PO Wholesaler vs frozen snapshot) and 1 should-fix (stale `v_sortie_load` guide) fixed; 1 judgement call (duplicate totals) fixed through `v_purchase_plan_total`. Spec — retry buffer drift, hidden short receipts, early Vehicle confirmation/re-basing and non-divisible cost precision fixed; received time is recorded by the operation rather than typed.
 - **Next:** `/clear`, then `/implement #8` (Delivery) or `/implement #12` (gate warning) — both unblocked. #9 needs #8; #10 needs #7 and #8; #11 needs #7, #8 and #9.
 
+### ✅ 4f. Ticket #8 — delivery, attestation and receipt echo, 2026-10-30
+
+- **Closed:** [#8](https://github.com/Fernado03/Sarpply/issues/8) on 2026-10-30 with the evidence comment.
+- **Commits:** `7a60ad8` (implementation), `7c58474` (review fixes). Branch `main`.
+- **Handover model:** one handover per Stall per Route Batch, because UI §4.4 collects one total and one payment method per Stall. `0011_delivery.sql` adds `stall_handovers` and append-only `stall_handover_lines`; `UNIQUE (route_batch_id, stall_id)` for a `PREORDER` Stall makes a second handover a retry, not a new record. The receipt is keyed `handover:PREORDER:<batch>:<stall>`, not per SKU line — **intentional deviation** from the ticket's "keyed to the order": `stall_orders` is one row per Stall and SKU, and a per-row key would echo one receipt per SKU with a line amount, while the Stall screen attests one total and method. The Stall key is still retry-safe.
+- **Atomic operation:** `fn_record_stall_handover` validates every line against the Stall's fulfilled Bundles, takes the Route Batch and Stall Order row locks, checks the Vehicle's hand under an advisory lock per SKU and Vehicle, writes one `HANDOVER` movement per line, records delivery status and the payment attestation, and creates exactly one receipt. A retry returns the existing handover and message; changed payment, lines or attester are refused as corrections. A first handover needs a Runner session assigned to the batch that has not expired; shift-window enforcement remains #13.
+- **Payment:** `UNPAID`, `PAID_CASH`, `PAID_DUITNOW`; DuitNow requires both a reference and a proof link. `v_route_batch_pnl` now publishes `uncollected_goods_myr`; collected counts only `PAID_CASH` and `PAID_DUITNOW`. The batch flips to `DELIVERED` when no `PENDING` Preorder remains, including an all-`UNCOLLECTED` Sortie, so the lifecycle has its terminal state.
+- **Receipt echo:** the action sends only the handover's own row through `deliverOutboundMessage`; a confirmation cannot flush another Stall's receipt or an unsent broadcast. A repeat finds the row `SENT` and does nothing; a failed send stays `FAILED` for the targeted `Send receipt` button. The message log keeps its narrow `Retry failed` action.
+- **Console:** per-Stall form with delivered Bundles capped at the fulfilled count, a client-side live total that updates before Confirm, payment method, DuitNow reference/proof, receipt status and send action. Phone-less Stall shows the audit result instead of a send action.
+- **Seed:** Runner A gets a 2026-11-05 session on the B02 batch.
+- **Evidence:** `npm test` 78 passed (6 delivery tests) against real PostgreSQL 16; `npm run typecheck` and `npm run build` clean. Production browser smoke at 360 px (`scrollWidth` 360): S01 cash RM 72.00, S02 DuitNow with reference/proof RM 37.50, P99 phone-less RM 30.00; receipt sent and retried from the card; PnL `gmv 139.50`, `collected 139.50`, `uncollected 0.00`.
+- **Review:** Standards — 1 must-fix (concurrent handovers could both approve the same stock; fixed with an advisory lock per SKU and Vehicle), 1 should-fix (an expired session could attest; fixed with `expires_at > clock_timestamp()`), 1 should-fix (quadratic grouping `push`); 1 accepted judgement call (duplicated Stall header in two components). Spec — the attester was optional and the receipt was never delivered, both fixed; the delivered total was not shown before Confirm, fixed with a client component; a retry with a different attester is now refused. The per-Stall receipt key and the batch `DELIVERED` transition are documented deviations above.
+
 ## ⬜ 5. Review — `/code-review`
 
 - Runs inside `/implement`; can also be typed on its own.
@@ -358,3 +371,5 @@ Never compact mid-phase. Every move except Continue turns a primary source into 
 | 2026-10-30 | Code review #6 | `/code-review 969d3bf` | Standards 2 hard (timing fixed; retention deferred to #16), 1 judgement; Spec 3 (labels verified, fake seam accepted, at-least-once documented) | `6919a47` |
 | 2026-10-30 | Implement #7 | `/implement 7` | Purchase plan, Wholesaler PO, receipt and console landed; issue #7 closed | `90e5665`, `db9cacc`; 72 tests at the database seam |
 | 2026-10-30 | Code review #7 | `/code-review 203d269` | Standards 2 must (cent precision, supplier mismatch), 1 should (stale guide), 1 judgement (totals); Spec 4 code findings (retry buffer, short defaults, Vehicle re-basing, cost precision); all code findings fixed | `db9cacc`; `ADR-0018`/`0019`; `v_purchase_plan_total` |
+| 2026-10-30 | Implement #8 | `/implement 8` | Stall handover, payment attestation, stock movements and receipt echo landed; issue #8 closed | `7a60ad8`, `7c58474`; 78 tests at the database and UI seams |
+| 2026-10-30 | Code review #8 | `/code-review 3906a0e` | Standards 1 must (concurrent stock race), 2 should (expired session, quadratic grouping) fixed; Spec attester, delivered total, changed-attester retry and broad receipt send fixed; per-Stall receipt key and batch `DELIVERED` transition documented as deviations | `7c58474`; `0011_delivery.sql`; `v_route_batch_pnl` |
