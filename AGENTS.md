@@ -16,3 +16,7 @@ Five canonical roles, label strings equal to role names: `needs-triage`, `needs-
 ### Domain docs
 
 Single-context: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
+
+### Workflow tracker
+
+`WORKFLOW.md` records the current skills-flow step and the run log. Read it before answering what step is next or starting a new step.
