@@ -11,11 +11,11 @@ Legend: `✅` done · `👉` current · `⬜` not started · `⏭` not applicabl
 ## Current position
 
 ```text
-✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅, #4 ✅, #5 ✅; next #6/#7) → ⬜ code-review → ⬜ pr → ⬜ retro
+✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅, #4 ✅, #5 ✅, #6 ✅; next #7) → ⬜ code-review → ⬜ pr → ⬜ retro
 ```
 
-- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a), ticket #4 text intake (§4b), ticket #5 Cutoff (§4c).
-- **Now:** `/implement #6` (WhatsApp transport) or `/implement #7` (Purchase) — both are unblocked. #12 unlocks when #6 lands; #8 needs #6 and #7.
+- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a), ticket #4 text intake (§4b), ticket #5 Cutoff (§4c), ticket #6 WhatsApp transport (§4d).
+- **Now:** `/implement #7` (Purchase) or `/implement #12` (gate warning before Cutoff) — both are unblocked. #8 needs #6 and #7.
 - **After that:** the rest of the graph; `/pr`, `/retro` at the end.
 
 ---
@@ -207,6 +207,18 @@ Per-ticket loop:
 - **Review:** Standards — 0 hard violations; 3 judgement calls (cross-file cutoff split, singleton boolean key, test-helper overlap), none actioned. Spec — 2 findings: the PO gap was stored but unused, and the Pool/Wholesaler snapshot paired independent rows. Both fixed in `ff8ff1f`: `fn_po_not_before` + trigger with a +29/−+30 test, and the snapshot now follows `pool_prices.wholesaler_price_id` (a competing primary quote test pins it).
 - **Next:** `/clear`, then `/implement #6` (WhatsApp) or #7 (Purchase) — both unblocked. #12 unlocks once #6 lands; #8 needs #6 and #7.
 
+### ✅ 4d. Ticket #6 — WhatsApp transport, 2026-10-30
+
+- **Closed:** [#6](https://github.com/Fernado03/Sarpply/issues/6) on 2026-10-30 with the evidence comment.
+- **Commits:** `89fb68b` (implementation), `6919a47` (review fixes). Branch `main`.
+- **Port and adapters:** `src/lib/messaging/` holds one `MessagingPort`, an in-memory `FakeMessagingAdapter` (unique provider ids, one-shot or permanent failure injection) and a `CloudApiMessagingAdapter` (Graph API text send, digits-only recipient, provider errors surfaced). `WHATSAPP_PROVIDER=fake|cloud` selects the adapter; cloud requires `WHATSAPP_ACCESS_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID`.
+- **Inbound webhook:** `src/app/api/whatsapp/webhook/route.ts` verifies Meta's `X-Hub-Signature-256` HMAC over the raw body with `WHATSAPP_APP_SECRET`; missing or forged signatures return 401. The subscription handshake compares `WHATSAPP_VERIFY_TOKEN` and returns 403 otherwise. `fn_store_inbound_message` (0009) keys on the provider message id, matches the sender's phone digits to a Stall and the current open batch, and stores text or audio metadata (`message_type`, media id/mime/duration, voice flag). No audio is transcribed and no order or voice draft is written.
+- **Broadcast:** `fn_queue_broadcast` builds Script B from the Pool Prices in force, derives the cutoff and delivery weekday/time from the batch, includes the seven-day voice-note line, and inserts one `QUEUED` row per active Stall under a per-batch/stall dedupe key; a second run queues nothing. `fn_pending_outbound_messages`, `fn_mark_outbound_sent` and `fn_mark_outbound_failed` update the same row, so a retry cannot create a second message row.
+- **Console:** message log for the batch (outbound status, provider result, failure reason, expandable body; inbound text and voice metadata) plus queue/send and retry-failed actions. Rendered at 390 px.
+- **Evidence:** `npm test` 62 passed (20 new) against real PostgreSQL 16; `npm run typecheck` and `npm run build` clean. Adapter tests cover signature accept/reject, fake failure-once/always, Cloud request shape and error mapping, config selection and payload parsing. Database/webhook tests cover signed acceptance, unsigned/forged 401, redelivery one row, voice metadata with unchanged order/draft counts, Script B price/retention/timing content, queue idempotency, provisional-Stall exclusion, closed-batch refusal, and failure recorded then retried on the same row. HTTP smoke: signed 200, unsigned/forged 401, handshake 200/403, two signed posts stored two rows. Console showed 9 sent, inbound text plus voice note, and `tutup pada (Rabu, 12:00)` / `hari Khamis petang` from the seeded batch.
+- **Review:** Standards — 2 hard violations, 1 judgement call. Broadcast timing was hardcoded; fixed in `6919a47` so the cutoff day/time and delivery day come from the batch. Voice-note deletion is **#16** (blocked by #11 and #15), not this ticket: #6 stores metadata only. Concurrent double-send is a residual risk accepted for the single-writer console. Spec — 3 findings, none required a code change: the `(N bungkus)` labels match Script B and the SKU bundle counts; the fake injects send failure/retry while every assertion reads database state (the ticket's own delivery acceptance); at-least-once provider duplication is documented in `README.md` because the Cloud API has no idempotency key for a text send.
+- **Next:** `/clear`, then `/implement #7` (Purchase) or #12 (gate warning) — both unblocked. #8 needs #6 and #7.
+
 ## ⬜ 5. Review — `/code-review`
 
 - Runs inside `/implement`; can also be typed on its own.
@@ -327,3 +339,5 @@ Never compact mid-phase. Every move except Continue turns a primary source into 
 | 2026-10-30 | Implement #4 | `/implement 4` | Text intake landed; issue #4 closed | `41ccad7`; 33 tests at the parser and database seams |
 | 2026-10-30 | Implement #5 | `/implement 5` | Cutoff landed; issue #5 closed | `5d4fe41`, `ff8ff1f`; 42 tests at the database seam |
 | 2026-10-30 | Code review #5 | `/code-review a186064` | Standards 0 hard violations, 3 judgement calls; Spec 2 findings (PO gap unused, price pairing); both fixed | `ff8ff1f` |
+| 2026-10-30 | Implement #6 | `/implement 6` | WhatsApp transport landed; issue #6 closed | `89fb68b`, `6919a47`; 62 tests at the adapter and database seams |
+| 2026-10-30 | Code review #6 | `/code-review 969d3bf` | Standards 2 hard (timing fixed; retention deferred to #16), 1 judgement; Spec 3 (labels verified, fake seam accepted, at-least-once documented) | `6919a47` |
