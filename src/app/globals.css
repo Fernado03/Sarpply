@@ -326,3 +326,97 @@ button.primary {
     grid-template-columns: 1fr;
   }
 }
+
+section h3 {
+  margin: 16px 0 6px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+button.secondary {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 16px;
+}
+
+.message-list {
+  list-style: none;
+  margin: 8px 0 20px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.message {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.message-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.message-status {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.message-status.failed {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.message-status.received {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.message-failure {
+  margin: 8px 0 0;
+  color: var(--warning);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.message summary {
+  margin-top: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.message-body {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

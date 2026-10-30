@@ -58,6 +58,29 @@ export interface MissingStallView {
   cluster: string;
 }
 
+export interface OutboundMessageView {
+  id: string;
+  stallCode: string | null;
+  toPhone: string;
+  body: string;
+  status: string;
+  queuedAt: string;
+  sentAt: string | null;
+  failureReason: string | null;
+}
+
+export interface InboundMessageView {
+  id: string;
+  stallCode: string | null;
+  fromPhone: string;
+  body: string | null;
+  messageType: string;
+  mediaMimeType: string | null;
+  mediaDurationSeconds: number | null;
+  isVoiceNote: boolean;
+  receivedAt: string;
+}
+
 export interface ConsoleView {
   batch: BatchView;
   stalls: StallView[];
@@ -65,6 +88,8 @@ export interface ConsoleView {
   catalogue: CatalogueView[];
   frozenPrices: FrozenPriceView[];
   missingPreorders: MissingStallView[];
+  outboundMessages: OutboundMessageView[];
+  inboundMessages: InboundMessageView[];
 }
 
 const NEXT_ACTION: Record<string, string> = {
@@ -185,6 +210,39 @@ export async function loadConsole(): Promise<ConsoleView | null> {
     [batch.id],
   );
 
+  const outboundResult = await pool.query<OutboundMessageView>(
+    `SELECT m.id,
+            st.stall_code AS "stallCode",
+            m.to_phone AS "toPhone",
+            m.body,
+            m.status,
+            TO_CHAR(m.queued_at AT TIME ZONE 'Asia/Kuching', 'Dy DD Mon, HH24:MI') AS "queuedAt",
+            TO_CHAR(m.sent_at AT TIME ZONE 'Asia/Kuching', 'Dy DD Mon, HH24:MI') AS "sentAt",
+            m.failure_reason AS "failureReason"
+     FROM outbound_messages m
+     LEFT JOIN stalls st ON st.id = m.stall_id
+     WHERE m.route_batch_id = $1
+     ORDER BY m.queued_at, m.id`,
+    [batch.id],
+  );
+
+  const inboundResult = await pool.query<InboundMessageView>(
+    `SELECT m.id,
+            st.stall_code AS "stallCode",
+            m.from_phone AS "fromPhone",
+            m.body,
+            m.message_type AS "messageType",
+            m.media_mime_type AS "mediaMimeType",
+            m.media_duration_seconds AS "mediaDurationSeconds",
+            m.is_voice_note AS "isVoiceNote",
+            TO_CHAR(m.received_at AT TIME ZONE 'Asia/Kuching', 'Dy DD Mon, HH24:MI') AS "receivedAt"
+     FROM inbound_messages m
+     LEFT JOIN stalls st ON st.id = m.stall_id
+     WHERE m.route_batch_id = $1
+     ORDER BY m.received_at DESC, m.id`,
+    [batch.id],
+  );
+
   return {
     batch,
     stalls: stallsResult.rows,
@@ -192,5 +250,7 @@ export async function loadConsole(): Promise<ConsoleView | null> {
     catalogue: catalogueResult.rows,
     frozenPrices: frozenResult.rows,
     missingPreorders: missingResult.rows,
+    outboundMessages: outboundResult.rows,
+    inboundMessages: inboundResult.rows,
   };
 }

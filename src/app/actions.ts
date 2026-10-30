@@ -8,6 +8,8 @@ import {
   draftLineNumbers,
   saveDraftLines,
 } from '@/lib/intake';
+import { appBroadcast, appRetry } from '@/lib/broadcast';
+import { createMessagingPort } from '@/lib/messaging';
 import { parseOrderText } from '@/lib/order-text';
 
 function field(formData: FormData, name: string): string {
@@ -71,4 +73,40 @@ export async function commitDraft(formData: FormData): Promise<void> {
   if (error) redirect(`/?intakeError=${encodeURIComponent(error)}`);
   revalidatePath('/');
   redirect('/?notice=committed');
+}
+
+export async function sendBroadcast(formData: FormData): Promise<void> {
+  let error: string | null = null;
+  let sent = 0;
+  let failed = 0;
+  try {
+    const batchId = field(formData, 'batchId');
+    if (!batchId) throw new Error('Missing Route Batch.');
+    const result = await appBroadcast(batchId, createMessagingPort());
+    sent = result.sent;
+    failed = result.failed;
+  } catch (caught) {
+    error = failure(caught);
+  }
+  if (error) redirect(`/?intakeError=${encodeURIComponent(error)}`);
+  revalidatePath('/');
+  redirect(`/?notice=broadcast&sent=${sent}&failed=${failed}`);
+}
+
+export async function retryMessages(formData: FormData): Promise<void> {
+  let error: string | null = null;
+  let sent = 0;
+  let failed = 0;
+  try {
+    const batchId = field(formData, 'batchId');
+    if (!batchId) throw new Error('Missing Route Batch.');
+    const result = await appRetry(batchId, createMessagingPort());
+    sent = result.sent;
+    failed = result.failed;
+  } catch (caught) {
+    error = failure(caught);
+  }
+  if (error) redirect(`/?intakeError=${encodeURIComponent(error)}`);
+  revalidatePath('/');
+  redirect(`/?notice=retried&sent=${sent}&failed=${failed}`);
 }

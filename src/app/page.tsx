@@ -1,4 +1,4 @@
-import { commitDraft, saveTextDraft } from './actions';
+import { commitDraft, retryMessages, saveTextDraft, sendBroadcast } from './actions';
 import { loadConsole, nextAction, statusLabel } from '@/lib/console';
 import { loadOpenDrafts } from '@/lib/intake';
 
@@ -6,6 +6,10 @@ export const dynamic = 'force-dynamic';
 
 function rm(value: string | null): string {
   return value === null ? '—' : `RM ${Number(value).toFixed(2)}`;
+}
+
+function firstLine(body: string): string {
+  return body.split('\n').find((line) => line.trim() !== '') ?? body;
 }
 
 interface PageProps {
@@ -18,6 +22,8 @@ export default async function Page({ searchParams }: PageProps) {
 
   const intakeError = typeof params.intakeError === 'string' ? params.intakeError : null;
   const notice = typeof params.notice === 'string' ? params.notice : null;
+  const sentCount = typeof params.sent === 'string' ? params.sent : '0';
+  const failedCount = typeof params.failed === 'string' ? params.failed : '0';
 
   if (!view) {
     return (
@@ -29,12 +35,22 @@ export default async function Page({ searchParams }: PageProps) {
     );
   }
 
-  const { batch, stalls, orders, catalogue, frozenPrices, missingPreorders } = view;
+  const {
+    batch,
+    stalls,
+    orders,
+    catalogue,
+    frozenPrices,
+    missingPreorders,
+    outboundMessages,
+    inboundMessages,
+  } = view;
   const clusters = new Map<string, typeof stalls>();
   for (const stall of stalls) {
     clusters.set(stall.cluster, [...(clusters.get(stall.cluster) ?? []), stall]);
   }
   const open = batch.status === 'OPEN_FOR_ORDERS';
+  const failedOutbound = outboundMessages.filter((message) => message.status === 'FAILED').length;
   const drafts = await loadOpenDrafts(batch.id);
 
   return (
@@ -52,6 +68,12 @@ export default async function Page({ searchParams }: PageProps) {
       ) : null}
       {notice === 'committed' ? (
         <p className="notice">Preorder committed to the batch.</p>
+      ) : null}
+      {notice === 'broadcast' || notice === 'retried' ? (
+        <p className={`notice${failedCount !== '0' ? ' error' : ''}`}>
+          {notice === 'broadcast' ? 'Broadcast queued. ' : 'Retry finished. '}
+          {sentCount} sent, {failedCount} failed.
+        </p>
       ) : null}
 
       <section className="card">
@@ -265,6 +287,90 @@ export default async function Page({ searchParams }: PageProps) {
               </tbody>
             </table>
           </div>
+        )}
+      </section>
+
+      <section>
+        <h2>Message log</h2>
+        {open ? (
+          <div className="message-actions">
+            <form action={sendBroadcast}>
+              <input type="hidden" name="batchId" value={batch.id} />
+              <button type="submit" className="primary">
+                Queue and send Tuesday broadcast
+              </button>
+            </form>
+            {failedOutbound > 0 ? (
+              <form action={retryMessages}>
+                <input type="hidden" name="batchId" value={batch.id} />
+                <button type="submit" className="secondary">
+                  Retry failed ({failedOutbound})
+                </button>
+              </form>
+            ) : null}
+          </div>
+        ) : (
+          <p className="empty">The broadcast belongs to an open Route Batch.</p>
+        )}
+
+        <h3>Outbound</h3>
+        {outboundMessages.length === 0 ? (
+          <p className="empty">No outbound messages for this batch.</p>
+        ) : (
+          <ul className="message-list">
+            {outboundMessages.map((message) => (
+              <li key={message.id} className="message">
+                <div className="message-head">
+                  <span className="stall-code">{message.stallCode ?? '—'}</span>
+                  <span className={`message-status ${message.status.toLowerCase()}`}>
+                    {statusLabel(message.status)}
+                  </span>
+                  <span className="stall-meta">
+                    {message.toPhone} · {message.sentAt ?? message.queuedAt}
+                  </span>
+                </div>
+                {message.failureReason ? (
+                  <p className="message-failure">{message.failureReason}</p>
+                ) : null}
+                <details>
+                  <summary>{firstLine(message.body)}</summary>
+                  <p className="message-body">{message.body}</p>
+                </details>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <h3>Inbound</h3>
+        {inboundMessages.length === 0 ? (
+          <p className="empty">No inbound messages for this batch.</p>
+        ) : (
+          <ul className="message-list">
+            {inboundMessages.map((message) => (
+              <li key={message.id} className="message">
+                <div className="message-head">
+                  <span className="stall-code">{message.stallCode ?? '—'}</span>
+                  <span className="message-status received">
+                    {message.isVoiceNote ? 'Voice note' : statusLabel(message.messageType)}
+                  </span>
+                  <span className="stall-meta">
+                    {message.fromPhone} · {message.receivedAt}
+                  </span>
+                </div>
+                {message.messageType === 'AUDIO' ? (
+                  <p className="message-body">
+                    Audio metadata stored; transcription is not enabled.
+                    {message.mediaDurationSeconds === null
+                      ? ''
+                      : ` ${message.mediaDurationSeconds}s`}
+                    {message.mediaMimeType ? ` · ${message.mediaMimeType}` : ''}
+                  </p>
+                ) : (
+                  <p className="message-body">{message.body ?? 'No text body.'}</p>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
