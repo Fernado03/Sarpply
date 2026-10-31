@@ -152,12 +152,13 @@ BEGIN
       RAISE EXCEPTION 'Stall % does not belong to this Route Batch', p_stall_id
         USING ERRCODE = 'check_violation';
     END IF;
-    IF v_stall.onboarding_status = 'ACTIVE' AND v_stall.whatsapp_phone IS NULL THEN
-      RAISE EXCEPTION 'an active Stall without a phone cannot receive a Spot Sale'
+    IF v_stall.onboarding_status NOT IN ('ACTIVE','PROVISIONAL_SPOT')
+       OR NOT v_stall.is_active THEN
+      RAISE EXCEPTION 'Stall % is not active for a Spot Sale', v_stall.stall_code
         USING ERRCODE = 'check_violation';
     END IF;
-    IF NOT v_stall.is_active AND v_stall.onboarding_status <> 'PROVISIONAL_SPOT' THEN
-      RAISE EXCEPTION 'Stall % is not active', v_stall.stall_code
+    IF v_stall.onboarding_status = 'ACTIVE' AND v_stall.whatsapp_phone IS NULL THEN
+      RAISE EXCEPTION 'an active Stall without a phone cannot receive a Spot Sale'
         USING ERRCODE = 'check_violation';
     END IF;
   ELSE
@@ -171,6 +172,8 @@ BEGIN
         USING ERRCODE = 'check_violation';
     END IF;
 
+    -- shortcut: a walk-up Stall attaches to the Route's first Cluster; add a
+    -- Cluster choice when per-Cluster walk-up reporting exists.
     SELECT c.id INTO v_cluster_id
       FROM clusters c
      WHERE c.route_id = v_batch.route_id
@@ -386,6 +389,7 @@ JOIN stall_orders o
  AND o.stall_id = st.id
  AND o.order_type = 'SPOT'
 WHERE st.onboarding_status = 'PROVISIONAL_SPOT'
+  AND o.payment_status IN ('PAID_CASH','PAID_DUITNOW')
   AND NOT EXISTS (
     SELECT 1
       FROM stall_orders p

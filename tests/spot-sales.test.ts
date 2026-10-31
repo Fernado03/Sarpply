@@ -418,13 +418,22 @@ describe('Spot Sale', () => {
     await withTransaction(async (db) => {
       const batchId = await createBatch(db, '2027-03-18');
       await receiveStock(db, batchId, 'A1', 10, '13.50');
+      await receiveStock(db, batchId, 'B1', 5, '12.00');
       await insertPriceSnapshot(db, batchId, 'A1');
+      await insertPriceSnapshot(db, batchId, 'B1');
       const sessionId = await createRunnerSession(db, batchId);
 
-      const sale = await createSpotSale(db, batchId, 'walk-up-3', 'A1', 2, 'PAID_CASH', {
+      const paidSale = await createSpotSale(db, batchId, 'walk-up-paid', 'A1', 2, 'PAID_CASH', {
         label: 'Kak Timah Walk-up',
         attestedBy: sessionId,
       });
+
+      // A second provisional buyer who did not pay is a sale but not a warm lead.
+      const unpaidSale = await createSpotSale(db, batchId, 'walk-up-unpaid', 'B1', 1, 'UNPAID', {
+        label: 'Uncle Foo Walk-up',
+        attestedBy: sessionId,
+      });
+      expect(unpaidSale.created).toBe(true);
 
       const leads = (await db.query<{
         stall_id: string;
@@ -441,7 +450,7 @@ describe('Spot Sale', () => {
       )).rows;
       expect(leads).toEqual([
         {
-          stall_id: sale.stall_id,
+          stall_id: paidSale.stall_id,
           stall_code: expect.stringMatching(/^SPOT-/),
           stall_name: 'Kak Timah Walk-up',
           spot_orders: 1,
@@ -450,9 +459,15 @@ describe('Spot Sale', () => {
         },
       ]);
 
+      const sales = (await db.query<{ count: string }>(
+        'SELECT COUNT(*)::text AS count FROM v_spot_sale WHERE route_batch_id = $1',
+        [batchId],
+      )).rows[0];
+      expect(sales.count).toBe('2');
+
       const messages = (await db.query<{ count: string }>(
         'SELECT COUNT(*)::text AS count FROM outbound_messages WHERE stall_id = $1',
-        [sale.stall_id],
+        [paidSale.stall_id],
       )).rows[0];
       expect(messages.count).toBe('0');
     });

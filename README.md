@@ -80,7 +80,7 @@ row is the internal audit result.
 
 A new buyer gets a `PROVISIONAL_SPOT` Stall with no phone, so no receipt echo is possible
 (ADR-0012). A registered Stall still receives the one-line sale receipt. The console lists
-Provisional Stalls that bought but did not Preorder — the warm onboarding list.
+Provisional Stalls that bought and paid but did not Preorder — the warm onboarding list.
 
 ## Tests
 

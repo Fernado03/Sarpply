@@ -811,7 +811,7 @@ export default async function Page({ searchParams }: PageProps) {
           ))
         )}
 
-        <h3>Provisional Stalls that bought but did not Preorder</h3>
+        <h3>Provisional Stalls that bought and paid but did not Preorder</h3>
         {provisionalLeads.length === 0 ? (
           <p className="empty">No walk-up buyer has bought without a Preorder.</p>
         ) : (
