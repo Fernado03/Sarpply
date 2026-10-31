@@ -2,20 +2,22 @@
 
 Human-facing checklist for the Matt Pocock skill flow. The issue tracker owns the work; this file owns **which step we are on**.
 
-Last updated: 2026-10-30
+Last updated: 2026-10-31
 
 Legend: `✅` done · `👉` current · `⬜` not started · `⏭` not applicable
+
+**Invocation:** commands are written bare (`/implement`) for readability. In OMP type `/skill:implement` — the pack ships skills, not slash commands; bare text is not executed.
 
 ---
 
 ## Current position
 
 ```text
-✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅, #4 ✅, #5 ✅, #6 ✅, #7 ✅, #8 ✅; next #9) → ⬜ code-review → ⬜ pr → ⬜ retro
+✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅, #4 ✅, #5 ✅, #6 ✅, #7 ✅, #8 ✅, #9 ✅; next #10 or #11) → ⬜ code-review → ⬜ pr → ⬜ retro
 ```
 
-- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a), ticket #4 text intake (§4b), ticket #5 Cutoff (§4c), ticket #6 WhatsApp transport (§4d), ticket #7 purchase and receipt (§4e), ticket #8 delivery, attestation and receipt echo (§4f).
-- **Now:** `/clear`, then `/implement #9` (Spot Sales) on the core path; #10 (shortfall rationing), #12 (gate warning), #13 (Runner least privilege) and #15 (voice orders) are also unblocked. #11 needs #9; #14 and #17 need #11.
+- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a), ticket #4 text intake (§4b), ticket #5 Cutoff (§4c), ticket #6 WhatsApp transport (§4d), ticket #7 purchase and receipt (§4e), ticket #8 delivery, attestation and receipt echo (§4f), ticket #9 Spot Sales and Provisional Stalls (§4g).
+- **Now:** `/clear`, then `/skill:ponytail full` once and `/skill:implement #10` (shortfall rationing) or `#11` (reconcile) on the core path; #12 (gate warning), #13 (Runner least privilege) and #15 (voice orders) are also unblocked. #14 and #17 need #11; #16 needs #11 and #15.
 - **After that:** the rest of the graph; `/pr`, `/retro` at the end.
 
 ---
@@ -153,9 +155,12 @@ Every finding above was applied to the ticket bodies in place. Issue numbers, ti
 | Mode | Command | How it runs | Use when |
 |---|---|---|---|
 | Per ticket | `/implement #<n>` | One ticket, `/clear` between tickets, blockers first | You want control; one context per ticket |
-| Whole spec | `/implement-spec 2` | Task graph → background implementer subagents on the frontier → integration branch → one review | You want the build orchestrated |
+| Whole spec | `/implement-spec 2` | Task graph → subagents on the frontier → integration branch → one review | You want the build orchestrated |
 
 Both drive `/tdd` (red → green, one vertical slice at a time) and finish with `/code-review`.
+
+**OMP note — `/implement-spec` does not run here.** It dispatches Claude Code's `implementer` and `merger` agents; OMP has neither, and a workflow naming a subagent must be translated to `task` at dispatch. The per-ticket loop below is the working path:
+`/skill:ponytail full` once, then `/skill:implement #<n>` per ticket.
 
 Per-ticket loop:
 
@@ -247,6 +252,21 @@ Per-ticket loop:
 - **Evidence:** `npm test` 78 passed (6 delivery tests) against real PostgreSQL 16; `npm run typecheck` and `npm run build` clean. Production browser smoke at 360 px (`scrollWidth` 360): S01 cash RM 72.00, S02 DuitNow with reference/proof RM 37.50, P99 phone-less RM 30.00; receipt sent and retried from the card; PnL `gmv 139.50`, `collected 139.50`, `uncollected 0.00`.
 - **Review:** Standards — 1 must-fix (concurrent handovers could both approve the same stock; fixed with an advisory lock per SKU and Vehicle), 1 should-fix (an expired session could attest; fixed with `expires_at > clock_timestamp()`), 1 should-fix (quadratic grouping `push`); 1 accepted judgement call (duplicated Stall header in two components). Spec — the attester was optional and the receipt was never delivered, both fixed; the delivered total was not shown before Confirm, fixed with a client component; a retry with a different attester is now refused. The per-Stall receipt key and the batch `DELIVERED` transition are documented deviations above.
 
+### ✅ 4g. Ticket #9 — Spot Sales and Provisional Stalls, 2026-10-31
+
+- **Closed:** [#9](https://github.com/Fernado03/Sarpply/issues/9) on 2026-10-31 with the evidence comment.
+- **Commits:** `ad447ba` (implementation), `842fd65` (review fixes). Branch `main`.
+- **Database:** `0012_spot_sales.sql` adds `fn_create_spot_sale`, `spot_stall_code_seq`, `v_spot_sale` and `v_provisional_spot_leads`.
+  - The operation takes a caller-supplied event key. An advisory lock on the key plus the unique `stall_handovers.dedupe_key` make a concurrent or repeated submission return the original sale; a changed SKU, count, payment or attester is refused.
+  - One call creates at most one Provisional Stall (`PROVISIONAL_SPOT`, no phone, Runner label, `SPOT-XXXXX` code), one `SPOT` order with source `STALL`, one `SPOT_SALE` movement and one `SPOT` handover row. The order is right-sized: `ordered_bundles = delivered_bundles`, so the delivered count is the truth.
+  - The unit price is the batch's frozen `locked_pool_bundle_price`; the movement carries the weighted-average unit cost from `fn_post_stock_movement`. A sale is refused before `GOODS_RECEIVED`, without a frozen price, over the Vehicle's on-hand balance, without an unexpired Runner session, or with an incomplete DuitNow attestation. Preorders are never updated.
+  - A registered Stall still gets the one-line `RESIT JUALAN` receipt; a phone-less Provisional Stall gets no outbound row, so the handover row is the internal audit result ADR-0012 accepts.
+  - `v_provisional_spot_leads` lists only `PAID_CASH`/`PAID_DUITNOW` Spot Sales for Provisional Stalls with no Preorder in the batch, matching ADR-0013's "bought and paid" list.
+- **Console:** Spot Sale form (buyer or new walk-up label, frozen SKU, delivered Bundles, payment, Runner), recorded sale cards with receipt state and targeted send, and the paid Provisional lead list. Rendered at 390 px and 360 px (`scrollWidth` 360 = `innerWidth`).
+- **Evidence:** `npm test` 82 passed (4 new Spot Sale tests at the PostgreSQL seam); `npm run typecheck` and `npm run build` clean. Browser smoke: a new walk-up `Ah Hock Corner Stall` bought 3 × A1 for RM 45.00; the database showed `order_type = SPOT`, source `STALL`, 2/2 right-sized, movement `SPOT_SALE` −3 at 13.500000, no outbound message, `v_route_batch_pnl` GMV 45.00 / Realized GP 4.50, and the buyer on the Provisional lead list.
+- **Review:** Standards — 1 hard violation (the action trusted a crafted seller; the database now refuses a Stall that is not `ACTIVE`/`PROVISIONAL_SPOT` or has `is_active = false`) fixed; 4 judgement calls (receipt body shared shape, sale card vs handover card, test helper duplication, flat input type) accepted, matching the delivery ticket's precedent. Spec — 1 finding: provisional leads included `UNPAID` sales despite ADR-0013's "bought and paid"; fixed in `842fd65` and pinned with an unpaid-sale test. No scope creep found.
+- **Next:** `/clear`, then `/skill:implement #10` or `#11`; #12, #13 and #15 are also unblocked. #14 and #17 need #11; #16 needs #11 and #15.
+
 ## ⬜ 5. Review — `/code-review`
 
 - Runs inside `/implement`; can also be typed on its own.
@@ -270,6 +290,8 @@ Per-ticket loop:
 ---
 
 ## Reference — all 27 skills
+
+All 27 ship as OMP skills from the `mattpocock-skills` plugin. Type `/skill:<name>`; the `Typed`/`Reached` split is `disable-model-invocation`.
 
 ### Typed (16) — only you can fire these
 
@@ -373,3 +395,5 @@ Never compact mid-phase. Every move except Continue turns a primary source into 
 | 2026-10-30 | Code review #7 | `/code-review 203d269` | Standards 2 must (cent precision, supplier mismatch), 1 should (stale guide), 1 judgement (totals); Spec 4 code findings (retry buffer, short defaults, Vehicle re-basing, cost precision); all code findings fixed | `db9cacc`; `ADR-0018`/`0019`; `v_purchase_plan_total` |
 | 2026-10-30 | Implement #8 | `/implement 8` | Stall handover, payment attestation, stock movements and receipt echo landed; issue #8 closed | `7a60ad8`, `7c58474`; 78 tests at the database and UI seams |
 | 2026-10-30 | Code review #8 | `/code-review 3906a0e` | Standards 1 must (concurrent stock race), 2 should (expired session, quadratic grouping) fixed; Spec attester, delivered total, changed-attester retry and broad receipt send fixed; per-Stall receipt key and batch `DELIVERED` transition documented as deviations | `7c58474`; `0011_delivery.sql`; `v_route_batch_pnl` |
+| 2026-10-31 | Implement #9 | `/implement 9` | Spot Sales and Provisional Stalls landed; issue #9 closed | `ad447ba`, `842fd65`; 82 tests at the database seam |
+| 2026-10-31 | Code review #9 | `/code-review 7c9a855` | Standards 1 hard (inactive/crafted seller) fixed, 4 judgement calls accepted; Spec 1 (paid-only provisional leads) fixed and pinned | `842fd65`; `0012_spot_sales.sql`; `v_provisional_spot_leads` |
