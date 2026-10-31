@@ -70,6 +70,18 @@ the received time, derives `cash_required_myr` from cartons received (not ordere
 `PURCHASE_RECEIPT` movement per line at the frozen carton cost. A short receipt stays visible; a
 retry with the same counts writes nothing, and a different count is refused.
 
+## Spot sales
+
+A walk-up sale is a new `SPOT` order with source `STALL`, priced from the Cutoff snapshot, never
+an edit of a Preorder. `fn_create_spot_sale` takes a caller-supplied event key and creates at most
+one Provisional Stall, one order and one `SPOT_SALE` movement; a retry returns the original sale
+and a changed payload is refused. The delivered count is right-sized at the stall, and the handover
+row is the internal audit result.
+
+A new buyer gets a `PROVISIONAL_SPOT` Stall with no phone, so no receipt echo is possible
+(ADR-0012). A registered Stall still receives the one-line sale receipt. The console lists
+Provisional Stalls that bought but did not Preorder — the warm onboarding list.
+
 ## Tests
 
 ```bash

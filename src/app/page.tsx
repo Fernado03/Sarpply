@@ -1,11 +1,14 @@
+import { randomUUID } from 'node:crypto';
 import { commitDraft, retryMessages, saveTextDraft, sendBroadcast } from './actions';
 import { HandoverLines } from './handover-lines';
 import { confirmHandover, sendHandoverReceipt } from './handover-actions';
 import { confirmVehicle, receivePurchaseOrder, submitPurchaseOrder } from './purchase-actions';
+import { recordSpotSale } from './spot-actions';
 import { loadConsole, nextAction, statusLabel } from '@/lib/console';
 import { loadHandover, receiptLabel, type HandoverStallView, type RunnerSessionView } from '@/lib/handover';
 import { loadOpenDrafts } from '@/lib/intake';
 import { loadPurchase, purchaseListText } from '@/lib/purchase';
+import { loadProvisionalLeads, loadSpotSales } from '@/lib/spot-sales';
 
 export const dynamic = 'force-dynamic';
 
@@ -172,6 +175,10 @@ export default async function Page({ searchParams }: PageProps) {
   const handoverSendError =
     typeof params.handoverSendError === 'string' ? params.handoverSendError : null;
   const handoverCreated = typeof params.created === 'string' ? params.created : null;
+  const spotError = typeof params.spotError === 'string' ? params.spotError : null;
+  const spotSendError =
+    typeof params.spotSendError === 'string' ? params.spotSendError : null;
+  const spotCreated = typeof params.created === 'string' ? params.created : null;
   const receiptError = typeof params.receiptError === 'string' ? params.receiptError : null;
   const receiptOutcome = typeof params.receipt === 'string' ? params.receipt : null;
   const notice = typeof params.notice === 'string' ? params.notice : null;
@@ -207,7 +214,12 @@ export default async function Page({ searchParams }: PageProps) {
   const drafts = await loadOpenDrafts(batch.id);
   const purchase = await loadPurchase(batch.id);
   const handover = await loadHandover(batch.id);
+  const spotSales = await loadSpotSales(batch.id);
+  const provisionalLeads = await loadProvisionalLeads(batch.id);
   const frozen = batch.status !== 'OPEN_FOR_ORDERS';
+  const canSpotSale =
+    (batch.status === 'GOODS_RECEIVED' || batch.status === 'DELIVERED') &&
+    frozenPrices.length > 0;
   const canConfirmVehicle =
     !purchase.vehicleConfirmed &&
     (batch.status === 'OPEN_FOR_ORDERS' || batch.status === 'CLOSED_AT_CUTOFF');
@@ -243,6 +255,11 @@ export default async function Page({ searchParams }: PageProps) {
           {handoverError}
         </p>
       ) : null}
+      {spotError ? (
+        <p className="notice error" role="alert">
+          {spotError}
+        </p>
+      ) : null}
       {receiptError ? (
         <p className="notice error" role="alert">
           {receiptError}
@@ -274,6 +291,14 @@ export default async function Page({ searchParams }: PageProps) {
             : receiptOutcome === 'failed'
               ? 'Receipt send failed; it stays queued for retry.'
               : 'Receipt was already sent or is no longer available.'}
+        </p>
+      ) : null}
+      {notice === 'spot' ? (
+        <p className={`notice${spotSendError ? ' error' : ''}`}>
+          {spotCreated === '0'
+            ? 'Spot Sale already recorded; nothing changed.'
+            : 'Spot Sale recorded.'}
+          {spotSendError ? ` Receipt not sent: ${spotSendError}` : ''}
         </p>
       ) : null}
       {notice === 'broadcast' || notice === 'retried' ? (
@@ -601,6 +626,207 @@ export default async function Page({ searchParams }: PageProps) {
               />
             ) : null,
           )
+        )}
+      </section>
+
+      <section>
+        <h2>Spot sales</h2>
+        {canSpotSale ? (
+          <form action={recordSpotSale} className="card intake-form">
+            <input type="hidden" name="batchId" value={batch.id} />
+            <input type="hidden" name="eventKey" value={randomUUID()} />
+            <label className="field">
+              <span>Buyer</span>
+              <select name="buyer" defaultValue="" required>
+                <option value="" disabled>
+                  Choose the buyer
+                </option>
+                <option value="NEW">New walk-up — Provisional Stall</option>
+                {stalls.map((stall) => (
+                  <option key={stall.id} value={stall.id}>
+                    {stall.stallCode} · {stall.stallName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Walk-up label (new buyer only)</span>
+              <input
+                name="provisionalLabel"
+                type="text"
+                placeholder="e.g. Ah Hock corner stall"
+              />
+            </label>
+            <label className="field">
+              <span>SKU sold</span>
+              <select name="skuCode" defaultValue="" required>
+                <option value="" disabled>
+                  Choose the SKU
+                </option>
+                {frozenPrices.map((price) => (
+                  <option key={price.skuCode} value={price.skuCode}>
+                    {price.skuCode} · {price.nameEn}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Delivered Bundles</span>
+              <input
+                name="deliveredBundles"
+                type="number"
+                min="1"
+                inputMode="numeric"
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Payment method</span>
+              <select name="paymentStatus" defaultValue="PAID_CASH">
+                <option value="PAID_CASH">Cash</option>
+                <option value="PAID_DUITNOW">DuitNow</option>
+                <option value="UNPAID">Unpaid — goods handed over</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>DuitNow reference (required for DuitNow)</span>
+              <input name="paymentReference" type="text" placeholder="e.g. DUIT-20261105-001" />
+            </label>
+            <label className="field">
+              <span>DuitNow proof link (required for DuitNow)</span>
+              <input name="paymentProofUrl" type="url" placeholder="https://…" />
+            </label>
+            {handover.runners.length > 0 ? (
+              <label className="field">
+                <span>Runner</span>
+                <select
+                  name="attestedBy"
+                  defaultValue={handover.runners[0].id}
+                  required
+                >
+                  {handover.runners.map((runner) => (
+                    <option key={runner.id} value={runner.id}>
+                      {runner.identity}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <p className="notice error">
+                No Runner session for this batch. A Spot Sale records who attested it.
+              </p>
+            )}
+            <p className="stall-meta">
+              Priced from the Cutoff snapshot. The delivered count is the sale; a
+              Preorder is never changed.
+            </p>
+            <button
+              type="submit"
+              className="primary"
+              disabled={handover.runners.length === 0}
+            >
+              Record Spot Sale
+            </button>
+          </form>
+        ) : (
+          <p className="empty">
+            Spot Sales open after the cartons are received and the prices are frozen.
+          </p>
+        )}
+
+        <h3>Recorded sales</h3>
+        {spotSales.length === 0 ? (
+          <p className="empty">No Spot Sale for this batch.</p>
+        ) : (
+          spotSales.map((sale) => (
+            <div key={sale.stallOrderId} className="card">
+              <div className="card-head">
+                <strong>
+                  {sale.stallCode} · {sale.stallName}
+                </strong>
+                <span className="badge">
+                  {sale.onboardingStatus === 'PROVISIONAL_SPOT'
+                    ? 'Provisional'
+                    : statusLabel(sale.paymentStatus)}
+                </span>
+              </div>
+              <dl className="facts">
+                <div>
+                  <dt>Total</dt>
+                  <dd>{rm(sale.totalMyr)}</dd>
+                </div>
+                <div>
+                  <dt>Payment</dt>
+                  <dd>{statusLabel(sale.paymentStatus)}</dd>
+                </div>
+                <div>
+                  <dt>Attested</dt>
+                  <dd>
+                    {sale.createdAt}
+                    {sale.runner ? ` · ${sale.runner}` : ''}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Receipt</dt>
+                  <dd>{receiptLabel(sale)}</dd>
+                </div>
+              </dl>
+              <ul className="receipt-lines">
+                <li className="receipt-line">
+                  <span className="stall-code">{sale.skuCode}</span>
+                  <span className="stall-meta">
+                    {sale.nameEn} · {sale.deliveredBundles} delivered ·{' '}
+                    {rm(sale.unitPrice)} each
+                  </span>
+                  <span className="badge">{sale.cluster}</span>
+                </li>
+              </ul>
+              {!sale.hasPhone ? (
+                <p className="notice">
+                  No receipt sent: this Provisional Stall has no phone. The sale is
+                  recorded internally.
+                </p>
+              ) : null}
+              {sale.receiptStatus === 'FAILED' ? (
+                <p className="notice error">
+                  Receipt failed: {sale.receiptFailure ?? 'send failed'}.
+                </p>
+              ) : null}
+              {sale.outboundMessageId &&
+              (sale.receiptStatus === 'QUEUED' || sale.receiptStatus === 'FAILED') ? (
+                <form action={sendHandoverReceipt}>
+                  <input type="hidden" name="messageId" value={sale.outboundMessageId} />
+                  <button type="submit" className="secondary">
+                    Send receipt
+                  </button>
+                </form>
+              ) : null}
+              {sale.receiptBody ? (
+                <details className="copy-list">
+                  <summary>Receipt message</summary>
+                  <p className="message-body">{sale.receiptBody}</p>
+                </details>
+              ) : null}
+            </div>
+          ))
+        )}
+
+        <h3>Provisional Stalls that bought but did not Preorder</h3>
+        {provisionalLeads.length === 0 ? (
+          <p className="empty">No walk-up buyer has bought without a Preorder.</p>
+        ) : (
+          <ul className="stall-list">
+            {provisionalLeads.map((lead) => (
+              <li key={lead.stallId}>
+                <span className="stall-code">{lead.stallCode}</span>
+                <span>{lead.stallName}</span>
+                <span className="stall-meta">
+                  {rm(lead.boughtMyr)} · {lead.deliveredBundles} Bundles ·{' '}
+                  {lead.cluster}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
