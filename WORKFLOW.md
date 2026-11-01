@@ -2,7 +2,7 @@
 
 Human-facing checklist for the Matt Pocock skill flow. The issue tracker owns the work; this file owns **which step we are on**.
 
-Last updated: 2026-10-31
+Last updated: 2026-11-01
 
 Legend: `✅` done · `👉` current · `⬜` not started · `⏭` not applicable
 
@@ -13,11 +13,11 @@ Legend: `✅` done · `👉` current · `⬜` not started · `⏭` not applicabl
 ## Current position
 
 ```text
-✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅, #4 ✅, #5 ✅, #6 ✅, #7 ✅, #8 ✅, #9 ✅; next #10 or #11) → ⬜ code-review → ⬜ pr → ⬜ retro
+✅ setup → ✅ grill-with-docs → ✅ to-spec → ✅ to-tickets → 👉 implement (#3 ✅, #4 ✅, #5 ✅, #6 ✅, #7 ✅, #8 ✅, #9 ✅, #11 ✅; next #10) → ⬜ code-review → ⬜ pr → ⬜ retro
 ```
 
-- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a), ticket #4 text intake (§4b), ticket #5 Cutoff (§4c), ticket #6 WhatsApp transport (§4d), ticket #7 purchase and receipt (§4e), ticket #8 delivery, attestation and receipt echo (§4f), ticket #9 Spot Sales and Provisional Stalls (§4g).
-- **Now:** `/clear`, then `/skill:ponytail full` once and `/skill:implement #10` (shortfall rationing) or `#11` (reconcile) on the core path; #12 (gate warning), #13 (Runner least privilege) and #15 (voice orders) are also unblocked. #14 and #17 need #11; #16 needs #11 and #15.
+- **Done:** setup, grilling, spec ([#2](https://github.com/Fernado03/Sarpply/issues/2)), tickets ([#3](https://github.com/Fernado03/Sarpply/issues/3)–[#17](https://github.com/Fernado03/Sarpply/issues/17)), ticket review and remediation (§3a, §3b), ticket #3 walking skeleton (§4a), ticket #4 text intake (§4b), ticket #5 Cutoff (§4c), ticket #6 WhatsApp transport (§4d), ticket #7 purchase and receipt (§4e), ticket #8 delivery, attestation and receipt echo (§4f), ticket #9 Spot Sales and Provisional Stalls (§4g), ticket #11 reconciliation and the gate verdict (§4h).
+- **Now:** `/clear`, then `/skill:ponytail full` once and `/skill:implement #10` (shortfall rationing) on the core path; #12 (gate warning), #13 (Runner least privilege) and #15 (voice orders) are also unblocked. #14, #16 and #17 are unblocked now that #11 is done; #16 also needs #15.
 - **After that:** the rest of the graph; `/pr`, `/retro` at the end.
 
 ---
@@ -267,6 +267,22 @@ Per-ticket loop:
 - **Review:** Standards — 1 hard violation (the action trusted a crafted seller; the database now refuses a Stall that is not `ACTIVE`/`PROVISIONAL_SPOT` or has `is_active = false`) fixed; 4 judgement calls (receipt body shared shape, sale card vs handover card, test helper duplication, flat input type) accepted, matching the delivery ticket's precedent. Spec — 1 finding: provisional leads included `UNPAID` sales despite ADR-0013's "bought and paid"; fixed in `842fd65` and pinned with an unpaid-sale test. No scope creep found.
 - **Next:** `/clear`, then `/skill:implement #10` or `#11`; #12, #13 and #15 are also unblocked. #14 and #17 need #11; #16 needs #11 and #15.
 
+### ✅ 4h. Ticket #11 — reconciliation and the gate verdict, 2026-11-01
+
+- **Closed:** [#11](https://github.com/Fernado03/Sarpply/issues/11) on 2026-11-01 with the evidence comment.
+- **Commit:** `ff32e18`. Branch `main`.
+- **Database:** `0013_reconcile.sql` replaces `v_route_batch_identity` with `v_route_batch_reconciliation` and appends `delivered_cost_myr` to `v_route_batch_pnl` (one cost figure for Realized GP, headroom and the identity).
+  - Publishes Forecast GP, Realized GP, GMV on Delivered Bundles, collected cash, cash paid, delivered cost, opening and closing Buffer at cost, Sortie cost, Net Batch Cash Flow, the identity residual to six decimals, headroom as a percent of delivered cost, and the gate verdict with its RM 1,500 / RM 150 thresholds.
+  - The residual is `Realized GP − (closing Buffer − opening Buffer) − Sortie cost − Net Batch Cash Flow`, rounded to the cent. Headroom is null when delivered cost is zero; the verdict is `PASS`, `FAIL_VOLUME`, `FAIL_MARGIN` or `FAIL_BOTH` and reads only Delivered Bundles.
+  - `fn_reconcile_batch` row-locks the batch, refuses a batch that is not `DELIVERED`, raises with the residual when it is not zero to the cent, and otherwise moves to `RECONCILED` with one transition. A retry returns the same row without a transition or a movement.
+- **Golden replays:** B01 — Forecast 173.00, Realized 167.00, closing Buffer 183.00, Net Cash −58.50, residual 0.000000, headroom 1.14%, `PASS`. B02 — Forecast 190.50, Realized 187.50, closing Buffer 37.50, Net Cash +290.50, residual 0.000000, headroom 2.19%, `PASS`.
+- **Multi-batch:** three synthetic batches on the Avanza carry Buffer Stock at posted cost through a Wholesaler price change (130 → 140 per carton), sell A1 down to zero, and keep the residual at 0.000000; each week's opening cost equals the previous closing cost.
+- **Rejection matrix:** one negative-SQL suite owns DuitNow without reference or proof, delivered > ordered, an active Stall with no phone, an invalid Trust Tier, an inconsistent `fulfilment_status`, an unsupported `written_language`, and UPDATE/DELETE on the stock ledger and the price snapshot. The duplicated ledger/cutoff immutability tests were removed so each contract has one owner.
+- **Console:** a Reconciliation section renders after Cutoff with the three figures, opening/closing Buffer, Sortie cost, delivered cost, the residual and headroom, plus the gate verdict sentence. A non-zero residual shows the refusal and withholds the action; a zero residual on a `DELIVERED` batch shows `Reconcile batch`. `loadConsole` now falls back to the most recently reconciled batch, so the published figures stay readable after the action.
+- **Evidence:** `npm test` 97 passed (12 files) against real PostgreSQL 16; `npm run typecheck` and `npm run build` clean. Browser smoke at 390 px (`innerWidth` 390 = `scrollWidth` 390): an unpaid 100-bundle batch showed residual `1500.000000`, `Net Batch Cash Flow −1342.50`, headroom 3.85%, `PASS` gate text and the refusal; attesting payment reloaded at `0.000000` and showed `Reconcile batch`; the action reached `RECONCILED`, kept the figures and wrote one transition, with the two stock movements unchanged.
+- **Review:** Standards — 0 hard violations; 2 judgement calls, both actioned: delivered cost is published once by `v_route_batch_pnl`, and the stock/snapshot immutability tests were consolidated into this ticket's matrix. Spec — 1 P2 finding actioned: reconciled figures disappeared from the console after submission; the console now shows the most recently reconciled batch. No missing acceptance criterion or scope creep found.
+- **Next:** `/clear`, then `/skill:implement #10`; #12, #13, #14, #15, #16 and #17 are unblocked, #16 also needs #15.
+
 ## ⬜ 5. Review — `/code-review`
 
 - Runs inside `/implement`; can also be typed on its own.
@@ -397,3 +413,5 @@ Never compact mid-phase. Every move except Continue turns a primary source into 
 | 2026-10-30 | Code review #8 | `/code-review 3906a0e` | Standards 1 must (concurrent stock race), 2 should (expired session, quadratic grouping) fixed; Spec attester, delivered total, changed-attester retry and broad receipt send fixed; per-Stall receipt key and batch `DELIVERED` transition documented as deviations | `7c58474`; `0011_delivery.sql`; `v_route_batch_pnl` |
 | 2026-10-31 | Implement #9 | `/implement 9` | Spot Sales and Provisional Stalls landed; issue #9 closed | `ad447ba`, `842fd65`; 82 tests at the database seam |
 | 2026-10-31 | Code review #9 | `/code-review 7c9a855` | Standards 1 hard (inactive/crafted seller) fixed, 4 judgement calls accepted; Spec 1 (paid-only provisional leads) fixed and pinned | `842fd65`; `0012_spot_sales.sql`; `v_provisional_spot_leads` |
+| 2026-11-01 | Implement #11 | `/implement 11` | Reconciliation view, fail-closed `fn_reconcile_batch`, golden replays, three-batch identity, delivered-bundle verdict, headroom and console landed; issue #11 closed | `ff32e18`; `0013_reconcile.sql`; 97 tests at the database seam |
+| 2026-11-01 | Code review #11 | `/code-review a0ca4a6` | Standards 0 hard, 2 judgement calls both fixed (single delivered-cost source; rejection matrix consolidated); Spec 1 P2 fixed (reconciled figures stay visible) | `ff32e18`; `v_route_batch_reconciliation`; `fn_reconcile_batch` |
