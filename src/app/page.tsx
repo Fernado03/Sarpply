@@ -3,11 +3,13 @@ import { commitDraft, retryMessages, saveTextDraft, sendBroadcast } from './acti
 import { HandoverLines } from './handover-lines';
 import { confirmHandover, sendHandoverReceipt } from './handover-actions';
 import { confirmVehicle, receivePurchaseOrder, submitPurchaseOrder } from './purchase-actions';
+import { reconcileBatch } from './reconcile-actions';
 import { recordSpotSale } from './spot-actions';
 import { loadConsole, nextAction, statusLabel } from '@/lib/console';
 import { loadHandover, receiptLabel, type HandoverStallView, type RunnerSessionView } from '@/lib/handover';
 import { loadOpenDrafts } from '@/lib/intake';
 import { loadPurchase, purchaseListText } from '@/lib/purchase';
+import { loadReconciliation, type ReconciliationView } from '@/lib/reconcile';
 import { loadProvisionalLeads, loadSpotSales } from '@/lib/spot-sales';
 
 export const dynamic = 'force-dynamic';
@@ -165,6 +167,122 @@ interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+function GateVerdict({ view }: { view: ReconciliationView }) {
+  const gmv = Number(view.gmvDeliveredMyr);
+  const gp = Number(view.realizedGpMyr);
+  const gmvShort = Math.max(0, Number(view.gmvThresholdMyr) - gmv);
+  const gpShort = Math.max(0, Number(view.gpThresholdMyr) - gp);
+  const gmvShortText = `RM ${gmvShort.toFixed(2)}`;
+  const gpShortText = `RM ${gpShort.toFixed(2)}`;
+
+  switch (view.gateVerdict) {
+    case 'PASS':
+      return (
+        <p className="notice">
+          Gate passes on Delivered Bundles: GMV {rm(view.gmvDeliveredMyr)} ≥{' '}
+          {rm(view.gmvThresholdMyr)} and Realized GP {rm(view.realizedGpMyr)} ≥{' '}
+          {rm(view.gpThresholdMyr)}.
+        </p>
+      );
+    case 'FAIL_VOLUME':
+      return (
+        <p className="notice error">
+          Volume failure: delivered GMV {rm(view.gmvDeliveredMyr)} is {gmvShortText} short
+          of {rm(view.gmvThresholdMyr)}; Realized GP {rm(view.realizedGpMyr)} clears{' '}
+          {rm(view.gpThresholdMyr)}. Recruit Stalls; do not automate a thin week.
+        </p>
+      );
+    case 'FAIL_MARGIN':
+      return (
+        <p className="notice error">
+          Margin failure: Realized GP {rm(view.realizedGpMyr)} is {gpShortText} short of{' '}
+          {rm(view.gpThresholdMyr)} while GMV clears {rm(view.gmvThresholdMyr)}.
+          Renegotiate carton costs or drop the thinnest SKUs.
+        </p>
+      );
+    default:
+      return (
+        <p className="notice error">
+          Volume and margin both fail: GMV {rm(view.gmvDeliveredMyr)} is {gmvShortText}{' '}
+          short and Realized GP {rm(view.realizedGpMyr)} is {gpShortText} short.
+        </p>
+      );
+  }
+}
+
+function ReconciliationSection({
+  batchId,
+  canReconcile,
+  view,
+}: {
+  batchId: string;
+  canReconcile: boolean;
+  view: ReconciliationView;
+}) {
+  const residualIsZero = Number(view.identityResidualMyr) === 0;
+
+  return (
+    <section>
+      <h2>Reconciliation</h2>
+      <div className="card">
+        <dl className="facts">
+          <div>
+            <dt>Forecast GP</dt>
+            <dd>{rm(view.forecastGpMyr)}</dd>
+          </div>
+          <div>
+            <dt>Realized GP</dt>
+            <dd>{rm(view.realizedGpMyr)}</dd>
+          </div>
+          <div>
+            <dt>Net batch cash flow</dt>
+            <dd>{rm(view.netCashFlowMyr)}</dd>
+          </div>
+          <div>
+            <dt>Opening Buffer at cost</dt>
+            <dd>{rm(view.openingBufferMyr)}</dd>
+          </div>
+          <div>
+            <dt>Closing Buffer at cost</dt>
+            <dd>{rm(view.closingBufferMyr)}</dd>
+          </div>
+          <div>
+            <dt>Sortie cost</dt>
+            <dd>{rm(view.sortieCostMyr)}</dd>
+          </div>
+          <div>
+            <dt>Delivered cost</dt>
+            <dd>{rm(view.deliveredCostMyr)}</dd>
+          </div>
+          <div>
+            <dt>Identity residual</dt>
+            <dd>{view.identityResidualMyr}</dd>
+          </div>
+          <div>
+            <dt>Gate headroom (% of delivered cost)</dt>
+            <dd>{view.headroomPct === null ? '—' : `${view.headroomPct}%`}</dd>
+          </div>
+        </dl>
+        <GateVerdict view={view} />
+        {canReconcile && residualIsZero ? (
+          <form action={reconcileBatch}>
+            <input type="hidden" name="batchId" value={batchId} />
+            <button type="submit" className="primary">
+              Reconcile batch
+            </button>
+          </form>
+        ) : null}
+        {canReconcile && !residualIsZero ? (
+          <p className="notice error">
+            Reconciliation refused: the identity residual is RM {view.identityResidualMyr}.
+            The ledger must read zero to the cent; the batch stays unreconciled.
+          </p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 export default async function Page({ searchParams }: PageProps) {
   const params = await searchParams;
   const view = await loadConsole();
@@ -181,6 +299,8 @@ export default async function Page({ searchParams }: PageProps) {
   const spotCreated = typeof params.created === 'string' ? params.created : null;
   const receiptError = typeof params.receiptError === 'string' ? params.receiptError : null;
   const receiptOutcome = typeof params.receipt === 'string' ? params.receipt : null;
+  const reconcileError =
+    typeof params.reconcileError === 'string' ? params.reconcileError : null;
   const notice = typeof params.notice === 'string' ? params.notice : null;
   const sentCount = typeof params.sent === 'string' ? params.sent : '0';
   const failedCount = typeof params.failed === 'string' ? params.failed : '0';
@@ -190,6 +310,9 @@ export default async function Page({ searchParams }: PageProps) {
       <main>
         <p className="brand">Sarpply</p>
         <h1>No open Route Batch</h1>
+        {notice === 'reconciled' ? (
+          <p className="notice">Batch reconciled. The identity read zero to the cent.</p>
+        ) : null}
         <p className="stall-meta">Run `npm run db:reset` to load the seeded week.</p>
       </main>
     );
@@ -216,6 +339,7 @@ export default async function Page({ searchParams }: PageProps) {
   const handover = await loadHandover(batch.id);
   const spotSales = await loadSpotSales(batch.id);
   const provisionalLeads = await loadProvisionalLeads(batch.id);
+  const reconciliation = await loadReconciliation(batch.id);
   const frozen = batch.status !== 'OPEN_FOR_ORDERS';
   const canSpotSale =
     (batch.status === 'GOODS_RECEIVED' || batch.status === 'DELIVERED') &&
@@ -265,6 +389,11 @@ export default async function Page({ searchParams }: PageProps) {
           {receiptError}
         </p>
       ) : null}
+      {reconcileError ? (
+        <p className="notice error" role="alert">
+          {reconcileError}
+        </p>
+      ) : null}
       {notice === 'vehicle' ? <p className="notice">Vehicle confirmed for the batch.</p> : null}
       {notice === 'po' ? <p className="notice">Wholesaler PO submitted.</p> : null}
       {notice === 'received' ? (
@@ -306,6 +435,9 @@ export default async function Page({ searchParams }: PageProps) {
           {notice === 'broadcast' ? 'Broadcast queued. ' : 'Retry finished. '}
           {sentCount} sent, {failedCount} failed.
         </p>
+      ) : null}
+      {notice === 'reconciled' ? (
+        <p className="notice">Batch reconciled. The identity read zero to the cent.</p>
       ) : null}
 
       <section className="card">
@@ -830,6 +962,14 @@ export default async function Page({ searchParams }: PageProps) {
         )}
       </section>
 
+      {frozen && reconciliation ? (
+        <ReconciliationSection
+          batchId={batch.id}
+          canReconcile={batch.status === 'DELIVERED'}
+          view={reconciliation}
+        />
+      ) : null}
+
       {!open ? (
         <section>
           <h2>Stalls with no Preorder</h2>
@@ -1104,8 +1244,8 @@ export default async function Page({ searchParams }: PageProps) {
       </section>
 
       <footer>
-        State, prices and stock are read from PostgreSQL. This screen renders; it does not compute
-        GP, Buffer Stock value or the reconciliation identity.
+        State, prices, stock and reconciliation are read from PostgreSQL. This screen
+        renders them; it does not recompute GP, Buffer Stock value or the identity.
       </footer>
     </main>
   );

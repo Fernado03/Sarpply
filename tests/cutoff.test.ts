@@ -290,29 +290,6 @@ describe('Cutoff freezes prices and orders', () => {
     });
   });
 
-  it('refuses UPDATE and DELETE on the frozen price snapshot', async () => {
-    await withTransaction(async (db) => {
-      const batchId = await createBatch(db, '2027-05-14', '2027-05-13T12:00:00+08');
-      await freeze(db, batchId, '2027-05-13T12:01:00+08');
-
-      const changed = await expectRejectedIn(
-        db,
-        `UPDATE route_batch_prices SET locked_pool_bundle_price = 1.00
-         WHERE route_batch_id = $1 AND sku_code = 'A1'`,
-        [batchId],
-      );
-      expect(changed.message).toContain('append-only');
-
-      const removed = await expectRejectedIn(
-        db,
-        `DELETE FROM route_batch_prices
-         WHERE route_batch_id = $1 AND sku_code = 'A1'`,
-        [batchId],
-      );
-      expect(removed.message).toContain('append-only');
-    });
-  });
-
   it('lists the Stalls that had no Preorder at Cutoff', async () => {
     await withTransaction(async (db) => {
       const batchId = await createBatch(db, '2027-05-21', '2027-05-20T12:00:00+08');

@@ -82,6 +82,19 @@ A new buyer gets a `PROVISIONAL_SPOT` Stall with no phone, so no receipt echo is
 (ADR-0012). A registered Stall still receives the one-line sale receipt. The console lists
 Provisional Stalls that bought and paid but did not Preorder — the warm onboarding list.
 
+## Reconciliation and the gate
+
+`v_route_batch_reconciliation` publishes Forecast GP, Realized GP, Net Batch Cash Flow, opening
+and closing Buffer Stock at cost, Sortie cost, delivered cost, the identity residual, gate
+headroom and the verdict. Forecast GP reads Ordered Bundles at the Cutoff snapshot; Realized GP
+and the gate read Delivered Bundles only. Headroom is a percent of delivered cost, and is null
+when nothing was delivered.
+
+`fn_reconcile_batch` moves a `DELIVERED` batch to `RECONCILED` only when
+`Realized GP − (closing Buffer − opening Buffer) − Sortie cost = Net Batch Cash Flow` reads zero
+to the cent. A non-zero residual raises with the amount and leaves the batch unreconciled; the
+console renders the residual and refuses the action. Re-running on a reconciled batch is a no-op.
+
 ## Tests
 
 ```bash

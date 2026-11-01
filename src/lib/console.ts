@@ -131,9 +131,14 @@ export async function loadConsole(): Promise<ConsoleView | null> {
      JOIN routes r ON r.id = b.route_id
      JOIN vehicles v ON v.id = b.vehicle_id
      WHERE b.status IN (
-       'OPEN_FOR_ORDERS','CLOSED_AT_CUTOFF','PO_SUBMITTED','GOODS_RECEIVED','DELIVERED'
+       'OPEN_FOR_ORDERS','CLOSED_AT_CUTOFF','PO_SUBMITTED','GOODS_RECEIVED','DELIVERED',
+       'RECONCILED'
      )
-     ORDER BY b.delivery_date ASC
+     -- A live batch wins; with none, show the most recently reconciled one so
+     -- its published figures stay readable.
+     ORDER BY (b.status = 'RECONCILED') ASC,
+              CASE WHEN b.status = 'RECONCILED' THEN b.reconciled_at END DESC NULLS LAST,
+              b.delivery_date ASC
      LIMIT 1`,
   );
   const batch = batchResult.rows[0];
